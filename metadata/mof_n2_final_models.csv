@@ -1,0 +1,17 @@
+model_name,model_group,topology,in_best_combo,lr,epochs,batch_size,architecture,hidden_dims,h_channels,cnn_layers,kernel_size,pool_size,fc_hidden,h_dim,layers,encoder_h_dim,encoder_heads,encoder_num_layers,decoder_h_dim,decoder_heads,decoder_num_layers,low_rank,patch_size,weight_decay,dropout,scaler,target_transform,target_scaler,dedup_R2,dedup_MAE,dedup_RMSE
+ann_homology,ann,homology,True,0.0005,100,32,ANN,2048-1024-1024-512-512-64,,,,,,,,,,,,,,,,0.0001,0.0,minmax,log10,minmax,0.8239180613497176,0.0484707601019862,0.0716262239023874
+ann_facet,ann,facet,True,0.0001,100,32,ANN,2048-1024-1024-512-512-64,,,,,,,,,,,,,,,,0.0001,0.0,minmax,log10,minmax,0.8312021316370162,0.0466068610113266,0.0701290780298933
+ann_forman,ann,forman,False,0.0008,100,32,ANN,2048-1024-1024-512-512-64,,,,,,,,,,,,,,,,0.0001,0.0,minmax,log10,minmax,0.7832554198411505,0.0531831613758154,0.0794673578357298
+ann_lap,ann,lap,False,0.0003,100,32,ANN,2048-1024-1024-512-512-64,,,,,,,,,,,,,,,,0.0001,0.0,minmax,log10,minmax,0.7772521883009209,0.0534184332501295,0.0805603554037569
+cnn_homology,cnn,homology,False,0.0005,100,32,CNN,,128.0,3.0,3.0,1.0,256.0,,,,,,,,,,,0.0001,0.0,minmax,log10,minmax,0.8032821845986295,0.0503796538515978,0.0757070801619827
+cnn_facet,cnn,facet,True,0.0008,100,32,CNN,,128.0,3.0,3.0,1.0,256.0,,,,,,,,,,,0.0001,0.0,minmax,log10,minmax,0.8243079220745321,0.0472612513000505,0.0715468866188598
+cnn_forman,cnn,forman,False,0.0008,100,32,CNN,,128.0,3.0,3.0,1.0,256.0,,,,,,,,,,,0.0001,0.0,minmax,log10,minmax,0.7737671375875241,0.0549058129041515,0.0811881219983915
+cnn_lap,cnn,lap,False,0.0009,100,32,CNN,,128.0,3.0,3.0,1.0,256.0,,,,,,,,,,,0.0001,0.0,minmax,log10,minmax,0.7845304420190484,0.0523681482245699,0.0792332756416268
+snn_homology,snn,homology,False,0.0002,100,32,SNN,,,,,,,128.0,3.0,,,,,,,,,0.0001,0.1,minmax,log10,minmax,0.8090734900946404,0.0514832939916303,0.0745843599795983
+snn_facet,snn,facet,False,0.0003,100,32,SNN,,,,,,,128.0,3.0,,,,,,,,,0.0001,0.1,minmax,log10,minmax,0.8122722973609346,0.0506083154451777,0.0739569228655615
+snn_forman,snn,forman,True,0.0005,100,32,SNN,,,,,,,128.0,3.0,,,,,,,,,0.0001,0.1,minmax,log10,minmax,0.7958142739122205,0.0519173110945996,0.0771307118985217
+snn_lap,snn,lap,False,0.0002,100,32,SNN,,,,,,,128.0,3.0,,,,,,,,,0.0001,0.1,minmax,log10,minmax,0.7570926714793704,0.0576682269417083,0.0841269142193382
+cop_homology,copresheaf,homology,True,0.0003,100,32,Copresheaf,,,,,,,,,64.0,4.0,3.0,512.0,8.0,3.0,8.0,1.0,0.05,,minmax,log10,minmax,0.8141633278133124,0.0507343973434343,0.0735834863002883
+cop_facet,copresheaf,facet,True,0.0006,100,32,Copresheaf,,,,,,,,,256.0,4.0,3.0,512.0,8.0,3.0,8.0,1.0,0.05,,minmax,log10,minmax,0.8232758824966819,0.0508207055226287,0.0717567170830563
+cop_forman,copresheaf,forman,False,0.0008,100,32,Copresheaf,,,,,,,,,128.0,4.0,3.0,512.0,8.0,3.0,8.0,1.0,0.05,,minmax,log10,minmax,0.800489193064277,0.0500342467723534,0.0762426289578065
+cop_lap,copresheaf,lap,False,0.001,100,32,Copresheaf,,,,,,,,,64.0,4.0,3.0,512.0,8.0,3.0,8.0,1.0,0.05,,minmax,log10,minmax,0.7716207083133049,0.055078855601319,0.0815723570002921

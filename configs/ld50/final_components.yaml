@@ -1,0 +1,32 @@
+application: ld50
+targets:
+  - LD50
+data_dir: data/ld50
+feature_dir: data/ld50/topology_features
+invariants:
+  PH:
+    path: data/ld50/topology_features/PH
+    topology_key: homology
+  PL:
+    path: data/ld50/topology_features/PL
+    topology_key: lap
+  CA:
+    path: data/ld50/topology_features/CA
+    topology_key: facet
+  EIC:
+    path: data/ld50/topology_features/EIC
+    topology_key: curvature
+  EIC_BI:
+    path: data/ld50/topology_features/EIC_BI
+    topology_key: curvature
+  FPRC:
+    path: data/ld50/topology_features/FPRC
+    topology_key: forman
+architectures:
+  ANN: applications/ld50/ann.py
+  CNN: applications/ld50/cnn.py
+  SNN: applications/ld50/snn.py
+  CTNN: applications/ld50/ctnn.py
+notes:
+  - EIC_BI is kept as a separate released feature group because it is used by selected LD50 components.
+  - Component-level hyperparameter sweeps and retained model summaries are documented in metadata/.

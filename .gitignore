@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.venv/
+venv/
+
+# Large generated inputs and outputs
+data/*
+!data/README.md
+!data/feature_manifest.csv
+data/features/
+data/mof/
+data/ld50/
+results/
+checkpoints/
+*.npy
+*.npz
+*.pt
+*.pth
+
+# Local logs and scheduler output
+*.log
+slurm-*.out
+*.err

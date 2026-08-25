@@ -1,0 +1,28 @@
+application: mof
+targets:
+  - O2uptakemolkg
+  - N2uptakemolkg
+data_dir: data/mof/2STD
+feature_dir: data/mof/features
+invariants:
+  PH:
+    path: data/mof/features/PH
+    topology_key: homology
+  PL:
+    path: data/mof/features/PL
+    topology_key: lap
+  CA:
+    path: data/mof/features/CA
+    topology_key: facet
+  FPRC:
+    path: data/mof/features/FPRC
+    topology_key: forman
+architectures:
+  ANN: applications/mof/ann.py
+  CNN: applications/mof/cnn.py
+  SNN: applications/mof/snn.py
+  CTNN: applications/mof/ctnn.py
+  GBT: applications/mof/gbt.py
+notes:
+  - EIC is not used for the MOF gas-uptake application.
+  - Component-level hyperparameter sweeps and retained model summaries are documented in metadata/.

@@ -1,0 +1,83 @@
+{
+  "paper": {
+    "title": "MINTNN: Mathematical Invariant-Enabled Topological Neural Networks",
+    "tasks_in_this_repository": [
+      "MOF O2/N2 uptake",
+      "LD50 quantitative toxicity"
+    ],
+    "main_feature_families": [
+      "persistent homology",
+      "persistent Laplacian",
+      "curvature/facet",
+      "Euler characteristic/integral curvature",
+      "Forman curvature"
+    ],
+    "main_network_families": [
+      "ANN",
+      "CNN",
+      "SNN",
+      "CTNN/CoPresheaf transformer"
+    ]
+  },
+  "data": {
+    "mof_o2": {
+      "train": 4192,
+      "validation": 524,
+      "test": 525,
+      "split": "random 8:1:1 in the supporting information; final local tables use CSCA-style seed ensembles"
+    },
+    "mof_n2": {
+      "train": 4105,
+      "validation": 513,
+      "test": 514,
+      "split": "random 8:1:1 in the supporting information; final local tables use CSCA-style seed ensembles"
+    },
+    "ld50": {
+      "train": 5931,
+      "test": 1482,
+      "split": "fixed train/test split"
+    }
+  },
+  "best_combos": {
+    "mof_o2": {
+      "rank": 1,
+      "combo_mask": 18214,
+      "n_components": 7,
+      "n_models": 4,
+      "n_topology_methods": 3,
+      "models_used": "ann+cnn+copresheaf+snn",
+      "topologies_used": "homology+facet+forman",
+      "R2": 0.925254890438001,
+      "MAE": 0.0316522799156574,
+      "RMSE": 0.0482087473825216,
+      "components": "ann:facet|ann:forman|cnn:facet|copresheaf:homology|copresheaf:facet|copresheaf:forman|snn:forman"
+    },
+    "mof_n2": {
+      "rank": 1,
+      "scope": "all_16_models",
+      "combo": "ann_homology+ann_facet+cnn_facet+snn_forman+cop_homology+cop_facet",
+      "n_models": 6,
+      "r2": 0.8556169415264252,
+      "mae": 0.0426009396276278,
+      "rmse": 0.0648593764415005,
+      "n_ann": 2,
+      "n_cnn": 1,
+      "n_snn": 1,
+      "n_cop": 2,
+      "n_homology": 2,
+      "n_facet": 3,
+      "n_forman": 1,
+      "n_lap": 0
+    },
+    "ld50": {
+      "label": "Current best 8-model 10-seed average",
+      "combo": "ann_homology+ann_facet+ann_curvature+cnn_facet+cnn_lap+cop_lap+cop_forman+snn_curvature",
+      "subset_note": "all models use 10-seed ensemble",
+      "R2_paper": 0.6803812318210066,
+      "PCC": 0.8248522484790877,
+      "RMSE": 0.5458712312851376,
+      "MAE": 0.401213773458633
+    }
+  },
+  "metadata_note": "CSV files were extracted from the final local result workbooks; local source paths are intentionally omitted from the public repository."
+}

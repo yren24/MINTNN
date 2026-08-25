@@ -1,0 +1,3 @@
+label,combo,subset_note,R2_paper,PCC,RMSE,MAE
+Current best 8-model 10-seed average,ann_homology+ann_facet+ann_curvature+cnn_facet+cnn_lap+cop_lap+cop_forman+snn_curvature,all models use 10-seed ensemble,0.6803812318210066,0.8248522484790877,0.5458712312851376,0.401213773458633
+Best low-cost 5-seed subset fusion,ann_homology+ann_facet+ann_curvature+cnn_facet+cnn_lap+cop_lap+cop_forman+snn_curvature,"snn_curvature uses seeds 1,3,5,6,8; other models use 10-seed ensemble",0.6809661185360646,0.8252067126096737,0.5453998051536169,0.4007127367442678

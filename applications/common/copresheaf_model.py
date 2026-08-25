@@ -1,0 +1,628 @@
+import torch
+import torch.nn as nn
+import numpy as np
+import math
+import torch.nn.functional as F
+
+
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# Positional Encoding (1D)
+# -------------------------------------------------------------------------------------------------
+class PositionalEncoding(nn.Module):
+    def __init__(self, dim, max_len=50):
+        super().__init__()
+        pe = torch.zeros(max_len, dim)
+        pos = torch.arange(max_len).unsqueeze(1).float()
+        half = dim//2
+        div  = torch.exp(torch.arange(half).float() * -(np.log(10000.0)/half))
+        pe[:, :half]       = torch.sin(pos*div)
+        pe[:, half:2*half] = torch.cos(pos*div)
+        self.register_buffer('pe', pe.unsqueeze(0))
+
+    def forward(self, x, start, end):
+        # x: [B, N, dim]
+        return x + self.pe[:,start:end,:]  
+
+
+# -------------------------------------------------------------------------------------------------
+# Initialize Topological Laplacian features: patch -> filtration_embedding -> random mask -> cls
+# -------------------------------------------------------------------------------------------------
+class TopoPatchEmbeddings(nn.Module):
+    def __init__(self,combination,num_statis,h_dim,patch_size ):
+        super().__init__()
+        self.combination = combination
+        self.num_statis = num_statis
+        self.patch_size = (patch_size,num_statis)
+        self.projection = nn.Conv2d(combination, h_dim, kernel_size=self.patch_size, stride=self.patch_size)
+
+    def forward(self, topological_features):
+        B, combination, L, num_statis = topological_features.shape
+        
+        if combination != self.combination:
+            raise ValueError(
+                "Make sure that the element-specific number of the Topological features match with the one set in the configuration."
+            )
+        if num_statis != self.num_statis:
+            raise ValueError(
+                "Make sure that the statistical property number of the Topological features match with the one set in the configuration."
+            )
+        
+        x = self.projection(topological_features).flatten(2).transpose(1, 2)
+        return x
+
+
+class TopoEmbeddings(nn.Module):
+    # init -> position embedding -> random mask
+    def __init__(self,combination,num_statis,h_dim,patch_size,max_len,mask_typ,mask_ratio):
+        super().__init__()
+        self.patch_embed = TopoPatchEmbeddings(combination,num_statis,h_dim,patch_size)
+        self.mask_ratio = mask_ratio
+        self.mask_typ = mask_typ
+        # filtration embedding
+        self.position_emb = PositionalEncoding(dim=h_dim, max_len=max_len)
+        
+        # cls
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, h_dim))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        torch.nn.init.normal_(self.cls_token, std=0.02)
+    
+    def random_masking(self, sequence, noise=None):
+        """
+        Perform per-sample random masking by per-sample shuffling. Per-sample shuffling is done by argsort random
+        noise.
+
+        Args:
+            sequence (`torch.LongTensor` of shape `(batch_size, sequence_length, dim)`)
+            noise (`torch.FloatTensor` of shape `(batch_size, sequence_length)`, *optional*) which is
+                mainly used for testing purposes to control randomness and maintain the reproducibility
+        """
+        batch_size, seq_length, dim = sequence.shape
+        len_keep = int(seq_length * (1 - self.mask_ratio))
+
+        if noise is None:
+            noise = torch.rand(batch_size, seq_length, device=sequence.device)  # noise in [0, 1]
+
+        # sort noise for each sample
+        ids_shuffle = torch.argsort(noise, dim=1)  # ascend: small is keep, large is remove
+        ids_restore = torch.argsort(ids_shuffle, dim=1)
+
+        # keep the first subset
+        ids_keep = ids_shuffle[:, :len_keep]
+        sequence_unmasked = torch.gather(sequence, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, dim))
+
+        # generate the binary mask: 0 is keep, 1 is remove
+        mask = torch.ones([batch_size, seq_length], device=sequence.device)
+        mask[:, :len_keep] = 0
+        # unshuffle to get the binary mask
+        mask = torch.gather(mask, dim=1, index=ids_restore)
+        
+        return sequence_unmasked, mask, ids_restore    
+    
+    
+    def span_masking(self, sequence, noise=None):
+        B, L, D = sequence.shape
+        len_keep = int(L * (1 - self.mask_ratio))
+        len_mask = L - len_keep
+        device = sequence.device
+    
+        mask = torch.zeros((B, L), device=device, dtype=torch.float32)
+        ids_restore = torch.arange(L, device=device).unsqueeze(0).repeat(B, 1)
+    
+        if len_mask <= 0:
+            return sequence, mask, ids_restore
+        if L==100:
+            SPAN_MIN, SPAN_MAX = 3, 8
+        elif L==150:
+            SPAN_MIN, SPAN_MAX = 6, 12
+        elif L==50:
+            SPAN_MIN, SPAN_MAX = 2, 5
+        else:
+            #### Fallback span lengths for dynamic filtration counts such as 20, 28, or 30.
+            SPAN_MIN, SPAN_MAX = max(1, min(2, L)), max(1, min(5, L))
+        exp_len = (SPAN_MIN + SPAN_MAX) / 2
+        n_spans = max(1, int(round(len_mask / exp_len)))  
+    
+        for b in range(B):
+            # span_len
+            span_lens = torch.randint(SPAN_MIN, SPAN_MAX + 1, (n_spans,), device=device)
+    
+            # start
+            starts_max = (L - span_lens).clamp_min(0)
+            if noise is None:
+                starts = torch.floor(torch.rand(n_spans, device=device) * (starts_max + 1).float()).long()
+    
+            # mask
+            for s, l in zip(starts.tolist(), span_lens.tolist()):
+                mask[b, s:s + l] = 1.0
+    
+            # 
+            cur = int(mask[b].sum().item())
+            if cur < len_mask:
+                need = len_mask - cur
+                unmasked_idx = torch.where(mask[b] == 0)[0]
+                extra = unmasked_idx[torch.randperm(unmasked_idx.numel(), device=device)[:need]]
+                mask[b, extra] = 1.0
+            elif cur > len_mask:
+                drop = cur - len_mask
+                masked_idx = torch.where(mask[b] == 1)[0]
+                to_unmask = masked_idx[torch.randperm(masked_idx.numel(), device=device)[:drop]]
+                mask[b, to_unmask] = 0.0
+            cur = int(mask[b].sum().item())
+            if len_mask != cur:
+                raise ValueError(f"expected mask length:{len_mask}, real mask length:{cur}")
+            assert len_mask==cur
+    
+        #ids_keep = torch.where(mask == 0)[1].view(B, -1)
+        ids_keep = mask.argsort(dim=1)[:, :len_keep]
+        sequence_unmasked = torch.gather(sequence, 1, ids_keep.unsqueeze(-1).expand(-1, -1, D))
+        return sequence_unmasked, mask, ids_restore
+    
+    def forward(self,topological_features, noise=None):
+        
+        x = self.patch_embed(topological_features)
+        
+        # position
+        x = self.position_emb(x,1,x.size(1)+1)
+        
+        # masking: length -> length * config.mask_ratio
+        if self.mask_typ=='random':
+            x, mask, ids_restore = self.random_masking(x, noise)
+        elif self.mask_typ=='span':
+            x, mask, ids_restore = self.span_masking(x, noise)
+        
+        # append cls
+        cls_token = self.position_emb(self.cls_token,0,1)
+        cls_tokens = cls_token.expand(x.shape[0], -1, -1)
+        embeddings = torch.cat((cls_tokens, x), dim=1)
+        
+        return embeddings, mask, ids_restore
+    
+    def encode(self,topological_features):
+        x = self.patch_embed(topological_features)
+        B, L, D = x.shape
+        cls_tokens = self.cls_token.expand(B, 1, D) 
+        embeddings = torch.cat((cls_tokens, x), dim=1) 
+
+        # position for whole sequence (cls at position 0)
+        embeddings = self.position_emb(embeddings, 0, embeddings.size(1))
+        return embeddings
+        
+
+# -------------------------------------------------------------------------------------------------
+# Sheaf Transformer Components
+# -------------------------------------------------------------------------------------------------
+
+class SheafValueTransformLinear(nn.Module):
+    def __init__(self, D, H, d):
+        super().__init__()
+        self.D = D # dim
+        self.H = H # heads
+        self.d = d # stalk_dim 
+
+        # W_i: (H, D, d), W_j: (H, D, d), W_v: (H, d, d), b: (H, d)
+        self.Wi = nn.Parameter(torch.empty(H, D, d))
+        self.Wj = nn.Parameter(torch.empty(H, D, d))
+        self.Wv = nn.Parameter(torch.empty(H, d, d))
+        self.b  = nn.Parameter(torch.zeros(H, d))
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        nn.init.xavier_uniform_(self.Wi)
+        nn.init.xavier_uniform_(self.Wj)
+        nn.init.xavier_uniform_(self.Wv)
+        nn.init.zeros_(self.b)
+
+    def forward(self, x, v, attn):
+        """
+        x:    (B, N, D)
+        v:    (B, H, N, d)   
+        attn: (B, H, N, N)     
+        return out: (B, H, N, d)
+        """
+        # Wi@Xi + b
+        # x @ Wi: (B,N,D) with (H,D,d) -> (B,H,N,d)
+        base_i = torch.einsum('bnd,hdk->bhnk', x, self.Wi) + self.b[None, :, None, :]
+
+        # \sum_{j}alpha(ij)Wj@Xj
+        xj_proj = torch.einsum('bnd,hdk->bhnk', x, self.Wj)              # (B,H,N,d)
+        out_j   = torch.matmul(attn, xj_proj)                            # (B,H,N,d)
+
+        # \sum_{j}alpha(ij)Wv@Vj
+        vj_proj = torch.einsum('bhnk,hkm->bhnm', v, self.Wv)              # (B,H,N,d)
+        out_v   = torch.matmul(attn, vj_proj)                            # (B,H,N,d)
+
+        return base_i + out_j + out_v
+
+
+class SheafValueTransformNonlinear(nn.Module):
+    def __init__(self, D, H, d, r = 8, bias= True):
+        super().__init__()
+        self.D = D # dim
+        self.H = H # heads
+        self.d = d # stalk_dim 
+        self.r = r # low rank dimension
+
+        # Per-head low-rank factors generated from x:
+        # U_net: x_i -> U_i (H, d, r)
+        # V_net: x_j -> V_j (H, d, r)
+        #
+        # We implement as linear layers producing H*d*r, then reshape.
+        self.U_net = nn.Linear(D, H * d * r, bias=bias)
+        self.V_net = nn.Linear(D, H * d * r, bias=bias)
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        nn.init.xavier_uniform_(self.U_net.weight)
+        nn.init.xavier_uniform_(self.V_net.weight)
+        if self.U_net.bias is not None:
+            nn.init.zeros_(self.U_net.bias)
+        if self.V_net.bias is not None:
+            nn.init.zeros_(self.V_net.bias)
+
+    def forward(self, x, v, attn):
+        B, N, D = x.shape
+
+        # Generate per-head low-rank factors and constrain coefficients to [-1, 1]
+        # U: (B, N, H, d, r) -> (B, H, N, d, r)
+        U = torch.tanh(self.U_net(x)).view(B, N, self.H, self.d, self.r).permute(0, 2, 1, 3, 4).contiguous()
+        V = torch.tanh(self.V_net(x)).view(B, N, self.H, self.d, self.r).permute(0, 2, 1, 3, 4).contiguous()
+
+        # s_j = V^T@v_j 
+        # V: (B,H,N,d,r), v: (B,H,N,d)  -> (B, H, N, r)
+        s = torch.einsum("bhn dr, bhn d -> bhn r", V, v)
+
+        # attention-weighted mixing over j: sum_j attn_{i,j} * s_j  -> (B, H, N, r)
+        s_mix = torch.matmul(attn, s)
+
+        # out_i = U_i @ s_mix_i  -> (B, H, N, d)
+        out = torch.einsum("bhn dr, bhn r -> bhn d", U, s_mix)
+        return out
+
+
+class SheafTransformerLayer(nn.Module):
+    def __init__(self, dim, heads, stalk_dim, low_rank, norm_typ,dropout):
+        super().__init__()
+        assert dim % heads == 0
+        self.norm_typ = norm_typ
+        self.heads,self.stalk_dim = heads,stalk_dim
+        self.dropout = nn.Dropout(dropout)
+        self.W_q = nn.Linear(dim, heads*stalk_dim)
+        self.W_k = nn.Linear(dim, heads*stalk_dim)
+        self.W_v = nn.Linear(dim, heads*stalk_dim)
+        self.W_o = nn.Linear(heads*stalk_dim, dim)
+        self.norm1= nn.LayerNorm(dim)
+        self.norm2= nn.LayerNorm(dim)
+        self.ffn  = nn.Sequential(
+            nn.Linear(dim, dim*4), nn.ReLU(), nn.Dropout(dropout),
+            nn.Linear(dim*4, dim)
+        )
+        
+        
+        #self.sheaf_transform = SheafValueTransformLinear(dim,heads,stalk_dim)
+        self.sheaf_transform = SheafValueTransformNonlinear(dim,heads,stalk_dim,low_rank)
+        
+        
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        nn.init.xavier_uniform_(self.W_q.weight)
+        nn.init.xavier_uniform_(self.W_k.weight)
+        nn.init.xavier_uniform_(self.W_v.weight)
+        nn.init.xavier_uniform_(self.W_o.weight)
+    
+    def post_norm_forward(self,x):
+        # post-norm
+        B,L,D = x.shape
+        q = self.W_q(x).view(B,L,self.heads,self.stalk_dim).transpose(1,2)
+        k = self.W_k(x).view(B,L,self.heads,self.stalk_dim).transpose(1,2)
+        v = self.W_v(x).view(B,L,self.heads,self.stalk_dim).transpose(1,2)
+        scores = torch.matmul(q, k.transpose(-2,-1)) / (math.sqrt(self.stalk_dim))
+        attn   = F.softmax(scores, dim=-1)
+        attn   = self.dropout(attn)
+        out = self.sheaf_transform(x, v, attn)   # (B,H,L,D)
+        out = out.transpose(1,2).reshape(B, L, -1)
+        out    = self.W_o(out)
+
+        x2     = self.norm1(x + self.dropout(out))
+        x3     = self.ffn(x2)
+        return self.norm2(x2 + self.dropout(x3))
+    
+    def pre_norm_forward(self,x1):
+        # pre-norm
+        x = self.norm1(x1)
+        B,L,D = x.shape
+        q = self.W_q(x).view(B,L,self.heads,self.stalk_dim).transpose(1,2)
+        k = self.W_k(x).view(B,L,self.heads,self.stalk_dim).transpose(1,2)
+        v = self.W_v(x).view(B,L,self.heads,self.stalk_dim).transpose(1,2)
+        
+        scores = torch.matmul(q, k.transpose(-2,-1)) / (math.sqrt(self.stalk_dim))
+        attn   = F.softmax(scores, dim=-1)
+        attn   = self.dropout(attn)
+        out = self.sheaf_transform(x, v, attn)   # (B,H,L,D)
+        out = out.transpose(1,2).reshape(B, L, -1)
+        out    = self.W_o(out)
+
+        x = x1 + self.dropout(out)
+        return x + self.dropout(self.ffn(self.norm2(x)))
+    
+    def forward(self,x):
+        if self.norm_typ=='pre_norm':
+            x = self.pre_norm_forward(x)
+            return x
+        elif self.norm_typ=='post_norm':
+            x = self.post_norm_forward(x)
+            return x
+
+
+
+
+# -------------------------------------------------------------------------------------------------
+# Encoder
+# -------------------------------------------------------------------------------------------------
+class TopoEncoder(nn.Module):
+    def __init__(self, dim, heads, stalk_dim, low_rank, dropout, num_layers, norm_typ):
+        super().__init__()
+        
+        self.layers = nn.ModuleList([ SheafTransformerLayer(dim, heads, stalk_dim, low_rank, norm_typ,dropout) for _ in range(num_layers) ])
+        
+    def forward(self,x):
+        for layer in self.layers:
+            x = layer(x)
+        return x
+
+
+# -------------------------------------------------------------------------------------------------
+# Prepare Decoder input: combine (unmasked, masked) together, add position embedding
+# -------------------------------------------------------------------------------------------------
+class DecoderInit(nn.Module):
+    def __init__(self,encoder_h_dim,decoder_h_dim,max_len,mask_typ):
+        super().__init__()
+        self.mask_typ = mask_typ
+        self.init = nn.Linear(encoder_h_dim, decoder_h_dim) 
+        self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_h_dim))
+        self.position_emb = PositionalEncoding(dim=decoder_h_dim, max_len=max_len)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        nn.init.xavier_uniform_(self.init.weight)
+        nn.init.normal_(self.mask_token, std=0.02)
+        
+    def random_mask_back(self,encoder_out,ids_restore):
+        '''
+        for random mask
+        '''
+        # [unmasked,masked] -> [B,L,d]
+        unmasked = self.init(encoder_out)
+        B,L_keep,_ = unmasked.shape
+        mask_tokens = self.mask_token.repeat(B, ids_restore.shape[1] + 1 - L_keep, 1)
+        x = torch.cat([unmasked[:,1:,:], mask_tokens], dim=1)
+        
+        # to original order
+        x = torch.gather(x, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]) )
+        
+        # append cls
+        x = torch.cat([unmasked[:, :1, :], x], dim=1)
+        
+        # fixed position embedding
+        x = self.position_emb(x,0,x.size(1))
+        return x
+        
+    def span_mask_back(self,encoder_out,mask):
+        '''
+        for span mask
+        '''
+        unmasked = self.init(encoder_out)
+        B, _, D = unmasked.shape
+        L = mask.shape[1]
+        
+        # start with all mask tokens (no CLS here)
+        x_full = self.mask_token.repeat(B, L, 1)  # (B, L, D)
+        
+        # positions of unmasked tokens (in original order)
+        ids_keep = torch.where(mask == 0)[1].view(B, -1)  # (B, L_keep)
+        
+        # scatter unmasked-tokens back to their original positions
+        kept_tokens = unmasked[:, 1:, :]  # (B, L_keep, D)
+        x_full.scatter_(dim=1, index=ids_keep.unsqueeze(-1).expand(-1, -1, D), src=kept_tokens)
+        
+        # append CLS back
+        x = torch.cat([unmasked[:, :1, :], x_full], dim=1) 
+        
+        # fixed position embedding
+        x = self.position_emb(x,0,x.size(1))
+        return x
+    
+    def forward(self,encoder_out,mask_or_ids_restore):
+        if self.mask_typ=='random':
+            x = self.random_mask_back(encoder_out,mask_or_ids_restore)
+            return x
+        elif self.mask_typ=='span':
+            x = self.span_mask_back(encoder_out,mask_or_ids_restore)
+            return x
+# -------------------------------------------------------------------------------------------------
+# Decoder
+# -------------------------------------------------------------------------------------------------     
+class TopoDecoder(nn.Module):
+    def __init__(self, dim, heads, stalk_dim, low_rank, dropout, num_layers, norm_typ):
+        super().__init__()
+        
+        self.layers = nn.ModuleList([ SheafTransformerLayer(dim, heads, stalk_dim, low_rank, norm_typ, dropout) for _ in range(num_layers) ])
+        
+    def forward(self,x):
+        for layer in self.layers:
+            x = layer(x)
+        return x
+
+
+# -------------------------------------------------------------------------------------------------
+# Masked CoPresheaf Transformer Pretrain
+# ------------------------------------------------------------------------------------------------- 
+class Pretrain(nn.Module):
+    def __init__(self, para):
+        super().__init__()
+        self.mask_typ = para.mask_typ
+        self.patch_size = para.patch_size
+        self.topo_embed = TopoEmbeddings(para.combination,para.num_statis,para.encoder_h_dim,para.patch_size,para.max_len,para.mask_typ,para.mask_ratio)
+        self.encoder = TopoEncoder(para.encoder_h_dim,para.encoder_heads,para.encoder_stalk_dim,para.low_rank,para.encoder_dropout,para.encoder_num_layers,para.norm_typ)
+        self.decoder_init = DecoderInit(para.encoder_h_dim,para.decoder_h_dim,para.max_len,para.mask_typ)
+        self.decoder = TopoDecoder(para.decoder_h_dim,para.decoder_heads,para.decoder_stalk_dim,para.low_rank,para.decoder_dropout,para.decoder_num_layers,para.norm_typ)
+        self.back = nn.Linear(para.decoder_h_dim,para.combination*para.num_statis*para.patch_size)
+        
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        nn.init.xavier_uniform_(self.back.weight)
+    
+    def patchy(self,topological_features):
+        B, combination, L, num_statis = topological_features.shape
+        x = topological_features.reshape(B,combination,L//self.patch_size,self.patch_size,num_statis)
+        x = x.permute(0,2,3,4,1).contiguous()
+        x = x.reshape(B,L//self.patch_size,self.patch_size*num_statis*combination)
+        return x
+    
+    def forward_loss(self,topological_features,pred,mask,norm_pix_loss=True,loss_on_patches='on_removed_patches'):
+        target = self.patchy(topological_features)
+        if norm_pix_loss:
+            mean = target.mean(dim=-1, keepdim=True)
+            var = target.var(dim=-1, keepdim=True)
+            target = (target - mean) / (var + 1.0e-6) ** 0.5
+
+        loss = (pred - target) ** 2
+        loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
+        
+        if loss_on_patches == 'on_removed_patches':
+            loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
+        elif loss_on_patches == 'on_all_patches':
+            loss = loss.mean()  # mean loss on all patches
+        return loss
+    
+    def forward(self,topological_features):
+        # prepare encoder input
+        x,mask,ids_restore = self.topo_embed(topological_features)
+        
+        # encoder
+        encoder_out = self.encoder(x)
+        
+        
+        # prepare decoder input
+        if self.mask_typ=='random':
+            decoder_in = self.decoder_init(encoder_out,ids_restore)
+        elif self.mask_typ=='span':
+            decoder_in = self.decoder_init(encoder_out,mask) 
+        # decoder
+        decoder_out = self.decoder(decoder_in)    
+        # remove cls
+        out = decoder_out[:,1:,:]
+        # project to original dim for reconstruct
+        pred = self.back(out)
+        
+        # loss
+        loss = self.forward_loss(topological_features,pred,mask)
+        return loss
+        
+    def encode(self,topological_features):
+        # prepare encoder input
+        x = self.topo_embed.encode(topological_features)
+        
+        # encoder
+        encoder_out = self.encoder(x)
+        return encoder_out
+
+        
+
+# -------------------------------------------------------------------------------------------------
+# Finetune
+# -------------------------------------------------------------------------------------------------
+class Finetune(nn.Module):
+    def __init__(self, para, model_path, use_pretrain=True, freeze_encoder=False):
+        super().__init__()
+        self.dim = para.encoder_h_dim
+        pretrained = Pretrain(para)
+        if use_pretrain:
+            state = torch.load(model_path, map_location="cpu",weights_only=False)
+            pretrained.load_state_dict(state['model'], strict=True)
+        self.backbone = pretrained
+        
+        self.fc = nn.Sequential(
+            nn.Linear(para.encoder_h_dim, para.encoder_h_dim*2),
+            nn.ReLU(),
+            nn.Linear(para.encoder_h_dim*2, 1)
+        )
+        if freeze_encoder:
+            for p in self.backbone.parameters():
+                p.requires_grad = False
+    
+    def forward(self,topological_features,pool='cls'):
+        x = self.backbone.encode(topological_features)
+        if pool=='cls':
+            x = x[:,0,:]
+        elif pool=='average':
+            x = x.mean(axis=1)
+        else:
+            x = x[:,0,:]
+        x = x.view(-1,self.dim) 
+        x = self.fc(x)         
+        return x  
+
+
+class FinetuneNewRank(nn.Module):
+    def __init__(self, para, model_path, new_low_rank, use_pretrain=True, freeze_encoder=False):
+        super().__init__()
+        self.dim = para.encoder_h_dim
+        
+        pretrained = Pretrain(para)
+        
+        if use_pretrain:
+            state = torch.load(model_path, map_location="cpu", weights_only=False)
+            pretrained.load_state_dict(state['model'], strict=True)
+            
+        self.backbone = pretrained
+        
+     
+        for layer in self.backbone.encoder.layers:
+            layer.sheaf_transform = SheafValueTransformNonlinear(
+                D=para.encoder_h_dim,
+                H=para.encoder_heads,
+                d=para.encoder_stalk_dim,
+                r=new_low_rank,  
+                bias=True
+            )
+        
+        if freeze_encoder:
+            for p in self.backbone.parameters():
+                p.requires_grad = False
+                
+  
+        self.fc = nn.Sequential(
+            nn.Linear(para.encoder_h_dim, para.encoder_h_dim * 2),
+            nn.ReLU(),
+            nn.Linear(para.encoder_h_dim * 2, 1)
+        )
+    
+    def forward(self, topological_features, pool='cls'):
+        x = self.backbone.encode(topological_features)
+        
+        if pool == 'cls':
+            x = x[:, 0, :]
+        elif pool == 'average':
+            x = x.mean(dim=1) 
+        else:
+            x = x[:, 0, :]
+            
+        x = x.view(-1, self.dim) 
+        x = self.fc(x)         
+        return x
+        
+        
+        
+        
+        
+        
