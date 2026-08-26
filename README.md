@@ -90,6 +90,16 @@ unzip MINTNN_LD50_final_features.zip
 
 This should create the `data/mof/` and `data/ld50/` directories shown above. The application scripts use these compact feature family names directly: `PH`, `PL`, `CA`, `EIC`, `EIC_BI`, and `FPRC`.
 
+To verify a downloaded feature package before training:
+
+```bash
+python scripts/audit_feature_archives.py \
+    --mof-zip MINTNN_MOF_final_features.zip \
+    --ld50-zip MINTNN_LD50_final_features.zip
+```
+
+The audit checks that every label entry has the expected `.npy` feature file under the directory names used by the code.
+
 ## Training
 
 Each component is defined by an application, an invariant family, and a neural architecture:
@@ -101,17 +111,17 @@ application + invariant + architecture
 Examples:
 
 ```text
-LD50 + EIC + CTNN
+LD50 + EIC_BI + CTNN
 MOF O2 + CA + CNN
 MOF N2 + FPRC + GBT
 ```
 
-The helper dispatcher in `scripts/train.py` builds the appropriate application command:
+The helper dispatcher in `scripts/train.py` builds the appropriate application command and, by default, injects the final component settings recorded in `metadata/`:
 
 ```bash
 python scripts/train.py \
     --application ld50 \
-    --invariant EIC \
+    --invariant EIC_BI \
     --architecture CTNN
 ```
 
@@ -145,6 +155,8 @@ python scripts/train.py \
 ```
 
 The underlying application scripts can also be called directly from `applications/mof/` or `applications/ld50/`.
+
+Use `--no-final-defaults` if you want the raw defaults of the application scripts instead of the final-component settings from `metadata/`.
 
 ## Evaluation
 
