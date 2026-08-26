@@ -19,14 +19,13 @@ from gbt import load_dataset
 torch.set_default_dtype(torch.float32)
 
 PROPERTY_DEFAULT = "O2uptakemolkg"
-TOPOLOGY_CHOICES = ["homology", "lap", "facet", "forman", "curvature"]
+TOPOLOGY_CHOICES = ["homology", "lap", "facet", "forman"]
 
 DEFAULT_FEATURE_ROOTS = {
     "homology": "data/mof/features/PH",
     "facet": "data/mof/features/CA",
     "forman": "data/mof/features/FPRC",
     "lap": "data/mof/features/PL",
-    "curvature": "data/mof/features/EIC",
 }
 
 

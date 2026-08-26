@@ -17,7 +17,7 @@ from gbt import load_dataset
 
 
 PROPERTY_DEFAULT = "O2uptakemolkg"
-TOPOLOGY_CHOICES = ["homology", "lap", "facet", "forman", "curvature"]
+TOPOLOGY_CHOICES = ["homology", "lap", "facet", "forman"]
 
 
 def parse_int_list(text):

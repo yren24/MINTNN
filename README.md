@@ -156,3 +156,26 @@ python scripts/evaluate.py \
     --true-column y_true \
     --pred-column y_pred
 ```
+
+## Final Consensus
+
+The released workflow treats a consensus model as an average over selected invariant-architecture component predictions. After training the selected components and saving their ensemble prediction arrays, prepare a manifest CSV:
+
+```text
+component,pred_path,true_path,names_path,weight
+ann_homology,results/ld50/ann/.../test-ensemble-pred.npy,results/ld50/ann/.../test-true.npy,results/ld50/ann/.../test-names.npy,1
+cnn_facet,results/ld50/cnn/.../test-ensemble-pred.npy,results/ld50/cnn/.../test-true.npy,results/ld50/cnn/.../test-names.npy,1
+ctnn_lap,results/ld50/copresheaf/.../test-ensemble-pred.npy,results/ld50/copresheaf/.../test-true.npy,results/ld50/copresheaf/.../test-names.npy,1
+snn_curvature,results/ld50/snn/.../test-ensemble-pred.npy,results/ld50/snn/.../test-ensemble-true.npy,results/ld50/snn/.../test-ensemble-names.npy,1
+```
+
+Then run:
+
+```bash
+python scripts/consensus.py \
+    --manifest configs/ld50/consensus_manifest.csv \
+    --output-dir results/ld50/consensus \
+    --name ld50_final
+```
+
+The consensus script aligns samples by name, checks target consistency, averages component predictions, and writes both consensus predictions and metrics.

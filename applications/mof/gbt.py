@@ -216,7 +216,7 @@ def run_cv(args):
 def main():
     parser = argparse.ArgumentParser(description="Run CSMOF1-style GBT on MOF topology features.")
     parser.add_argument("--property", default=PROPERTY_DEFAULT)
-    parser.add_argument("--topology", required=True, choices=["homology", "lap", "facet", "forman", "curvature"])
+    parser.add_argument("--topology", required=True, choices=["homology", "lap", "facet", "forman"])
     parser.add_argument("--repeat", type=int, default=0)
     parser.add_argument("--fold", type=int, default=None, help="Optional 0-based fold index for uahpc-style single-fold runs.")
     parser.add_argument("--folds", type=int, default=5)
