@@ -157,16 +157,17 @@ def apply_ld50_final_defaults(command, passthrough, architecture, topology, inva
     add_option(command, passthrough, "--seeds", seeds)
     add_option(command, passthrough, "--epoch", row.get("epochs"), integer=True)
     add_option(command, passthrough, "--batch-size", row.get("batch_size"), integer=True)
-    add_option(command, passthrough, "--feature-transform", row.get("feature_transform"))
 
     if architecture == "ANN":
         add_option(command, passthrough, "--layers", "2048,2048,1024,1024,512,64")
     elif architecture == "CNN":
+        add_option(command, passthrough, "--feature-transform", row.get("feature_transform"))
         add_option(command, passthrough, "--h-channels", row.get("h_dim_or_channels"), integer=True)
         add_option(command, passthrough, "--num-layers", row.get("layers"), integer=True)
         add_option(command, passthrough, "--kernel", "3", integer=True)
         add_option(command, passthrough, "--pool", "1", integer=True)
     elif architecture == "CTNN":
+        add_option(command, passthrough, "--feature-transform", row.get("feature_transform"))
         add_option(command, passthrough, "--encoder-h-dims", row.get("h_dim_or_channels"), integer=True)
         add_option(command, passthrough, "--encoder-num-layers", row.get("layers"), integer=True)
         add_option(command, passthrough, "--encoder-heads", "4", integer=True)
