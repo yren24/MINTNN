@@ -21,32 +21,6 @@ MINTNN_MOF_final_features.zip
 MINTNN_LD50_final_features.zip
 ```
 
-After downloading and extracting the archives, the recommended local organization is:
-
-```text
-data/
-├── mof/
-│   ├── 2STD/
-│   │   ├── O2uptakemolkg.xlsx
-│   │   └── N2uptakemolkg.xlsx
-│   └── features/
-│       ├── PH/
-│       ├── PL/
-│       ├── CA/
-│       └── FPRC/
-│
-└── ld50/
-    ├── LD50_train.csv
-    ├── LD50_test.csv
-    └── topology_features/
-        ├── PH/
-        ├── PL/
-        ├── CA/
-        ├── EIC/
-        ├── EIC_BI/
-        └── FPRC/
-```
-
 A concise manifest of the released feature groups is provided in:
 
 ```text
