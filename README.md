@@ -5,7 +5,7 @@
 **MINTNN** is a molecular and materials learning framework that couples multiscale mathematical invariant representations with neural network architectures. The repository provides the application code used to evaluate how complementary topological and geometric descriptors interact with different neural processing mechanisms.
 
 <p align="center">
-  <img src="assets/mintnn_workflow.png" alt="MINTNN workflow" width="72%">
+  <img src="assets/mintnn_workflow.png" alt="MINTNN workflow" width="78%">
 </p>
 
 ## Precomputed Feature Download
