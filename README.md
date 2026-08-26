@@ -156,15 +156,3 @@ python scripts/evaluate.py \
     --true-column y_true \
     --pred-column y_pred
 ```
-
-## Metadata
-
-The `metadata/` directory contains workbook-derived summaries used to organize the released feature groups and final application components. These files document which invariant-architecture combinations were retained in the cleaned release without storing large feature tensors in Git.
-
-## Citation
-
-If you use this repository, please cite the accompanying MINTNN manuscript.
-
-## License
-
-License terms are provided in `LICENSE`.
