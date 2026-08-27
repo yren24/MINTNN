@@ -1,0 +1,41 @@
+#
+# Reference Linux/CUDA 12.1 lock for the environment used by the original
+# embed_nn experiments. This file preserves the pip-compile lock found at:
+# /Volumes/Seagate Backup/weicomputer-home/embed_nn/requirements.txt
+#
+# The public MINTNN repository additionally uses pandas/openpyxl for utility
+# scripts and torch-geometric for SNN components; those direct dependencies are
+# listed at the end of this file.
+#
+filelock==3.20.3
+fsspec==2026.1.0
+jinja2==3.1.6
+joblib==1.5.3
+markupsafe==3.0.3
+mpmath==1.3.0
+networkx==3.6.1
+numpy==1.26.4
+nvidia-cublas-cu12==12.1.3.1
+nvidia-cuda-cupti-cu12==12.1.105
+nvidia-cuda-nvrtc-cu12==12.1.105
+nvidia-cuda-runtime-cu12==12.1.105
+nvidia-cudnn-cu12==9.1.0.70
+nvidia-cufft-cu12==11.0.2.54
+nvidia-curand-cu12==10.3.2.106
+nvidia-cusolver-cu12==11.4.5.107
+nvidia-cusparse-cu12==12.1.0.106
+nvidia-nccl-cu12==2.20.5
+nvidia-nvjitlink-cu12==12.9.86
+nvidia-nvtx-cu12==12.1.105
+scikit-learn==1.3.2
+scipy==1.17.0
+sympy==1.14.0
+threadpoolctl==3.6.0
+torch==2.4.1
+triton==3.0.0
+typing-extensions==4.15.0
+
+# Additional direct dependencies used by this public release.
+pandas>=2.0
+openpyxl>=3.1
+torch-geometric>=2.4,<3
