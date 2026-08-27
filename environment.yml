@@ -1,15 +1,17 @@
 name: mintnn
 channels:
-  - conda-forge
   - pytorch
+  - nvidia
+  - pyg
+  - conda-forge
 dependencies:
-  - python=3.10
-  - numpy=1.26
+  - python=3.11
+  - numpy=1.26.4
+  - scipy>=1.10
+  - scikit-learn=1.3.2
   - pandas>=2.0
   - openpyxl>=3.1
-  - scipy>=1.10
-  - scikit-learn=1.3
-  - pytorch=2.4
+  - pytorch=2.4.1
+  - pytorch-cuda=12.1
+  - pyg>=2.4
   - pip
-  - pip:
-      - torch-geometric>=2.4,<3
