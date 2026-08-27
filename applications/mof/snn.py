@@ -281,7 +281,7 @@ def prepare_fold(args, topologies, data=None, split_index=None):
 
     nodes, width = x.shape[1], x.shape[2]
     scaler = make_x_scaler(args)
-    if args.split_style == "csca" and args.csca_global_x_scaler:
+    if args.csca_global_x_scaler:
         x_scaled = scaler.fit_transform(x.reshape(x.shape[0], -1)).astype(np.float32).reshape(x.shape[0], nodes, width)
         x_train, x_val, x_test = x_scaled[train_idx], x_scaled[val_idx], x_scaled[test_idx]
     else:
@@ -376,7 +376,7 @@ def run_one(args, topologies=None, data=None, split_index=None, write_outputs=Tr
 
     print(
         f"#### SNN input={tuple(x_train.shape[1:])} h_dim={args.h_dim} layers={args.layers} lr={args.lr} "
-        f"epochs={args.epochs} batch={args.batch_size} seed={args.seed} split_style={args.split_style} "
+        f"epochs={args.epochs} batch={args.batch_size} seed={args.seed} "
         f"split={split['split_label']} x_scaler={args.scaler} csca_global_x_scaler={args.csca_global_x_scaler} "
         f"target_transform={args.target_transform} target_scaler={args.target_scaler} device={device}",
         flush=True,
@@ -430,7 +430,7 @@ def run_one(args, topologies=None, data=None, split_index=None, write_outputs=Tr
     if write_outputs:
         with open(result_path, "w") as f:
             f.write(f"[{args.property}] SNN topologies={output_name} Split {split['split_label']}, Model seed {args.seed}\n")
-            f.write(f"Split style: {args.split_style}\n")
+            f.write("Split protocol: CSCA-style random 80/10/10\n")
             f.write(f"Split index: {split['split_index']}\n")
             f.write(f"Data seed: {split['data_seed']}\n")
             f.write(f"Feature scaler: {args.scaler}\n")
@@ -471,7 +471,6 @@ def run_one(args, topologies=None, data=None, split_index=None, write_outputs=Tr
         print(f"#### saved {pred_path}", flush=True)
 
     return {
-        "split_style": args.split_style,
         "split": split["split_index"],
         "data_seed": split["data_seed"],
         "split_label": split["split_label"],
@@ -643,7 +642,7 @@ def run_many_csca_splits(args):
             "property": args.property,
             "topologies": topologies,
             "output_name": output_name,
-            "split_style": args.split_style,
+            "split_protocol": "csca_style_random_80_10_10",
             "splits_run": split_list,
             "data_seed_start": args.data_seed_start,
             "model_seeds": seed_list,
@@ -681,10 +680,6 @@ def main():
     parser.add_argument("--property", default=PROPERTY_DEFAULT)
     parser.add_argument("--topology", default="homology", choices=TOPOLOGY_CHOICES)
     parser.add_argument("--topologies", default=None, help="Comma-separated topology list; nodes are concatenated across methods.")
-    parser.add_argument("--split-style", choices=["kfold", "csca"], default="kfold")
-    parser.add_argument("--repeat", type=int, default=0)
-    parser.add_argument("--fold", type=int, default=0)
-    parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--split", type=int, default=None)
     parser.add_argument("--n-splits", type=int, default=10)
     parser.add_argument("--data-seed-start", type=int, default=23)
@@ -716,16 +711,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--device", default=None)
     args = parser.parse_args()
-
-    if args.split_style == "csca":
-        run_many_csca_splits(args)
-    else:
-        if args.dry_run:
-            topologies = parse_topologies(args)
-            _, x, _, _, _ = load_snn_data(args, topologies)
-            print(f"#### dry run loaded data={x.shape}; no training launched.", flush=True)
-            return
-        run_one(args)
+    run_many_csca_splits(args)
 
 
 if __name__ == "__main__":

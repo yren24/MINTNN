@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import KFold, train_test_split
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from torch.utils.data import DataLoader, Dataset
 
@@ -211,55 +211,30 @@ def load_ann_data(args, topologies):
 
 def split_indices(args, n_samples, split_index=None):
     indices = np.arange(n_samples)
-    if args.split_style == "kfold":
-        kf = KFold(n_splits=args.folds, shuffle=True, random_state=args.repeat)
-        folds = list(kf.split(indices))
-        fold = args.fold if split_index is None else split_index
-        if fold < 0 or fold >= len(folds):
-            raise ValueError(f"Fold index {fold} is out of range for {len(folds)} folds.")
-        train_idx, valtest_idx = folds[fold]
-        val_idx, test_idx = train_test_split(
-            valtest_idx,
-            test_size=0.5,
-            random_state=args.repeat * 10 + fold,
-            shuffle=True,
-        )
-        return {
-            "train_idx": train_idx,
-            "val_idx": val_idx,
-            "test_idx": test_idx,
-            "split_label": f"repeat{args.repeat}_fold{fold}",
-            "split_index": fold,
-            "data_seed": args.repeat * 10 + fold,
-        }
-
-    if args.split_style == "csca":
-        split = 0 if split_index is None else split_index
-        if split < 0 or split >= args.n_splits:
-            raise ValueError(f"CSCA split index {split} is out of range for n_splits={args.n_splits}.")
-        data_seed = args.data_seed_start + split
-        train_idx, tmp_idx = train_test_split(
-            indices,
-            test_size=0.20,
-            random_state=data_seed,
-            shuffle=True,
-        )
-        val_idx, test_idx = train_test_split(
-            tmp_idx,
-            test_size=0.50,
-            random_state=data_seed,
-            shuffle=True,
-        )
-        return {
-            "train_idx": train_idx,
-            "val_idx": val_idx,
-            "test_idx": test_idx,
-            "split_label": f"csca_split{split}_dataseed{data_seed}",
-            "split_index": split,
-            "data_seed": data_seed,
-        }
-
-    raise ValueError(f"Unknown split_style: {args.split_style}")
+    split = 0 if split_index is None else split_index
+    if split < 0 or split >= args.n_splits:
+        raise ValueError(f"CSCA split index {split} is out of range for n_splits={args.n_splits}.")
+    data_seed = args.data_seed_start + split
+    train_idx, tmp_idx = train_test_split(
+        indices,
+        test_size=0.20,
+        random_state=data_seed,
+        shuffle=True,
+    )
+    val_idx, test_idx = train_test_split(
+        tmp_idx,
+        test_size=0.50,
+        random_state=data_seed,
+        shuffle=True,
+    )
+    return {
+        "train_idx": train_idx,
+        "val_idx": val_idx,
+        "test_idx": test_idx,
+        "split_label": f"csca_split{split}_dataseed{data_seed}",
+        "split_index": split,
+        "data_seed": data_seed,
+    }
 
 
 def make_x_scaler(args):
@@ -290,7 +265,7 @@ def prepare_fold(args, topologies, data=None, split_index=None):
     mof_test = kept[test_idx]
 
     scaler = make_x_scaler(args)
-    if args.split_style == "csca" and args.csca_global_x_scaler:
+    if args.csca_global_x_scaler:
         x_scaled = scaler.fit_transform(x).astype(np.float32)
         x_train = x_scaled[train_idx]
         x_val = x_scaled[val_idx]
@@ -392,7 +367,7 @@ def run_one(args, topologies=None, data=None, split_index=None, write_outputs=Tr
     print(
         f"#### ANN d_in={x_train.shape[1]} hidden={hidden_dims} lr={args.lr} "
         f"epochs={args.epochs} batch={args.batch_size} seed={args.seed} "
-        f"split_style={args.split_style} split={split['split_label']} "
+        f"split={split['split_label']} "
         f"x_scaler={args.scaler} target_transform={args.target_transform} "
         f"target_scaler={args.target_scaler} output_activation={args.output_activation} device={device}",
         flush=True,
@@ -444,7 +419,7 @@ def run_one(args, topologies=None, data=None, split_index=None, write_outputs=Tr
     if write_outputs:
         with open(result_path, "w") as f:
             f.write(f"[{args.property}] ANN topologies={output_name} Split {split['split_label']}, Model seed {args.seed}\n")
-            f.write(f"Split style: {args.split_style}\n")
+            f.write("Split protocol: CSCA-style random 80/10/10\n")
             f.write(f"Split index: {split['split_index']}\n")
             f.write(f"Data seed: {split['data_seed']}\n")
             f.write(f"Feature scaler: {args.scaler}\n")
@@ -480,7 +455,6 @@ def run_one(args, topologies=None, data=None, split_index=None, write_outputs=Tr
         print(f"#### saved {pred_path}", flush=True)
 
     return {
-        "split_style": args.split_style,
         "split": split["split_index"],
         "data_seed": split["data_seed"],
         "split_label": split["split_label"],
@@ -640,7 +614,7 @@ def run_many_csca_splits(args):
             "property": args.property,
             "topologies": topologies,
             "output_name": output_name,
-            "split_style": args.split_style,
+            "split_protocol": "csca_style_random_80_10_10",
             "splits_run": split_list,
             "data_seed_start": args.data_seed_start,
             "model_seeds": seed_list,
@@ -677,10 +651,6 @@ def main():
     parser.add_argument("--property", default=PROPERTY_DEFAULT)
     parser.add_argument("--topology", default="homology", choices=TOPOLOGY_CHOICES)
     parser.add_argument("--topologies", default=None, help="Comma-separated topology list to concatenate, e.g. homology,facet.")
-    parser.add_argument("--split-style", choices=["kfold", "csca"], default="kfold")
-    parser.add_argument("--repeat", type=int, default=0)
-    parser.add_argument("--fold", type=int, default=0, help="0-based fold index, matching uahpc-style GBT split.")
-    parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--split", type=int, default=None, help="0-based CSCA split index. For example, --split 5 uses data_seed=28 when data_seed_start=23.")
     parser.add_argument("--n-splits", type=int, default=10, help="Number of CSCA-style random 80/10/10 splits.")
     parser.add_argument("--data-seed-start", type=int, default=23, help="CSCA-style data split seed start.")
@@ -709,10 +679,7 @@ def main():
     parser.add_argument("--print-every", type=int, default=10)
     parser.add_argument("--device", default=None)
     args = parser.parse_args()
-    if args.split_style == "csca":
-        run_many_csca_splits(args)
-    else:
-        run_one(args)
+    run_many_csca_splits(args)
 
 
 if __name__ == "__main__":
