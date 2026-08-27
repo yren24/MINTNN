@@ -45,18 +45,12 @@ conda env create -f environment.yml
 conda activate mintnn
 ```
 
-The environment file is intended for Linux GPU or HPCC-style reproduction with CUDA 12.1, PyTorch 2.4.1, and PyTorch Geometric. It supports all released architecture families, including SNN.
+The environment file supports all released architecture families and is the recommended setup for full reproduction.
 
 Alternatively, install the Python requirements into an existing environment:
 
 ```bash
 pip install -r requirements.txt
-```
-
-The SNN components require PyTorch Geometric. For CUDA-specific installations, use PyTorch Geometric wheels matching your PyTorch and CUDA versions. Additional environment notes are provided in:
-
-```text
-docs/environment.md
 ```
 
 After installation, verify the environment with:
