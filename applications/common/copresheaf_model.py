@@ -29,7 +29,7 @@ class PositionalEncoding(nn.Module):
 
 
 # -------------------------------------------------------------------------------------------------
-# Initialize Topological Laplacian features: patch -> filtration_embedding -> random mask -> cls
+# Initialize topological features: patch -> filtration embedding -> CLS
 # -------------------------------------------------------------------------------------------------
 class TopoPatchEmbeddings(nn.Module):
     def __init__(self,combination,num_statis,h_dim,patch_size ):
@@ -56,12 +56,9 @@ class TopoPatchEmbeddings(nn.Module):
 
 
 class TopoEmbeddings(nn.Module):
-    # init -> position embedding -> random mask
-    def __init__(self,combination,num_statis,h_dim,patch_size,max_len,mask_typ,mask_ratio):
+    def __init__(self,combination,num_statis,h_dim,patch_size,max_len):
         super().__init__()
         self.patch_embed = TopoPatchEmbeddings(combination,num_statis,h_dim,patch_size)
-        self.mask_ratio = mask_ratio
-        self.mask_typ = mask_typ
         # filtration embedding
         self.position_emb = PositionalEncoding(dim=h_dim, max_len=max_len)
         
@@ -71,118 +68,7 @@ class TopoEmbeddings(nn.Module):
 
     def reset_parameters(self):
         torch.nn.init.normal_(self.cls_token, std=0.02)
-    
-    def random_masking(self, sequence, noise=None):
-        """
-        Perform per-sample random masking by per-sample shuffling. Per-sample shuffling is done by argsort random
-        noise.
 
-        Args:
-            sequence (`torch.LongTensor` of shape `(batch_size, sequence_length, dim)`)
-            noise (`torch.FloatTensor` of shape `(batch_size, sequence_length)`, *optional*) which is
-                mainly used for testing purposes to control randomness and maintain the reproducibility
-        """
-        batch_size, seq_length, dim = sequence.shape
-        len_keep = int(seq_length * (1 - self.mask_ratio))
-
-        if noise is None:
-            noise = torch.rand(batch_size, seq_length, device=sequence.device)  # noise in [0, 1]
-
-        # sort noise for each sample
-        ids_shuffle = torch.argsort(noise, dim=1)  # ascend: small is keep, large is remove
-        ids_restore = torch.argsort(ids_shuffle, dim=1)
-
-        # keep the first subset
-        ids_keep = ids_shuffle[:, :len_keep]
-        sequence_unmasked = torch.gather(sequence, dim=1, index=ids_keep.unsqueeze(-1).repeat(1, 1, dim))
-
-        # generate the binary mask: 0 is keep, 1 is remove
-        mask = torch.ones([batch_size, seq_length], device=sequence.device)
-        mask[:, :len_keep] = 0
-        # unshuffle to get the binary mask
-        mask = torch.gather(mask, dim=1, index=ids_restore)
-        
-        return sequence_unmasked, mask, ids_restore    
-    
-    
-    def span_masking(self, sequence, noise=None):
-        B, L, D = sequence.shape
-        len_keep = int(L * (1 - self.mask_ratio))
-        len_mask = L - len_keep
-        device = sequence.device
-    
-        mask = torch.zeros((B, L), device=device, dtype=torch.float32)
-        ids_restore = torch.arange(L, device=device).unsqueeze(0).repeat(B, 1)
-    
-        if len_mask <= 0:
-            return sequence, mask, ids_restore
-        if L==100:
-            SPAN_MIN, SPAN_MAX = 3, 8
-        elif L==150:
-            SPAN_MIN, SPAN_MAX = 6, 12
-        elif L==50:
-            SPAN_MIN, SPAN_MAX = 2, 5
-        else:
-            #### Fallback span lengths for dynamic filtration counts such as 20, 28, or 30.
-            SPAN_MIN, SPAN_MAX = max(1, min(2, L)), max(1, min(5, L))
-        exp_len = (SPAN_MIN + SPAN_MAX) / 2
-        n_spans = max(1, int(round(len_mask / exp_len)))  
-    
-        for b in range(B):
-            # span_len
-            span_lens = torch.randint(SPAN_MIN, SPAN_MAX + 1, (n_spans,), device=device)
-    
-            # start
-            starts_max = (L - span_lens).clamp_min(0)
-            if noise is None:
-                starts = torch.floor(torch.rand(n_spans, device=device) * (starts_max + 1).float()).long()
-    
-            # mask
-            for s, l in zip(starts.tolist(), span_lens.tolist()):
-                mask[b, s:s + l] = 1.0
-    
-            # 
-            cur = int(mask[b].sum().item())
-            if cur < len_mask:
-                need = len_mask - cur
-                unmasked_idx = torch.where(mask[b] == 0)[0]
-                extra = unmasked_idx[torch.randperm(unmasked_idx.numel(), device=device)[:need]]
-                mask[b, extra] = 1.0
-            elif cur > len_mask:
-                drop = cur - len_mask
-                masked_idx = torch.where(mask[b] == 1)[0]
-                to_unmask = masked_idx[torch.randperm(masked_idx.numel(), device=device)[:drop]]
-                mask[b, to_unmask] = 0.0
-            cur = int(mask[b].sum().item())
-            if len_mask != cur:
-                raise ValueError(f"expected mask length:{len_mask}, real mask length:{cur}")
-            assert len_mask==cur
-    
-        #ids_keep = torch.where(mask == 0)[1].view(B, -1)
-        ids_keep = mask.argsort(dim=1)[:, :len_keep]
-        sequence_unmasked = torch.gather(sequence, 1, ids_keep.unsqueeze(-1).expand(-1, -1, D))
-        return sequence_unmasked, mask, ids_restore
-    
-    def forward(self,topological_features, noise=None):
-        
-        x = self.patch_embed(topological_features)
-        
-        # position
-        x = self.position_emb(x,1,x.size(1)+1)
-        
-        # masking: length -> length * config.mask_ratio
-        if self.mask_typ=='random':
-            x, mask, ids_restore = self.random_masking(x, noise)
-        elif self.mask_typ=='span':
-            x, mask, ids_restore = self.span_masking(x, noise)
-        
-        # append cls
-        cls_token = self.position_emb(self.cls_token,0,1)
-        cls_tokens = cls_token.expand(x.shape[0], -1, -1)
-        embeddings = torch.cat((cls_tokens, x), dim=1)
-        
-        return embeddings, mask, ids_restore
-    
     def encode(self,topological_features):
         x = self.patch_embed(topological_features)
         B, L, D = x.shape
@@ -380,107 +266,34 @@ class TopoEncoder(nn.Module):
 
 
 # -------------------------------------------------------------------------------------------------
-# Prepare Decoder input: combine (unmasked, masked) together, add position embedding
-# -------------------------------------------------------------------------------------------------
-class DecoderInit(nn.Module):
-    def __init__(self,encoder_h_dim,decoder_h_dim,max_len,mask_typ):
-        super().__init__()
-        self.mask_typ = mask_typ
-        self.init = nn.Linear(encoder_h_dim, decoder_h_dim) 
-        self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_h_dim))
-        self.position_emb = PositionalEncoding(dim=decoder_h_dim, max_len=max_len)
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        nn.init.xavier_uniform_(self.init.weight)
-        nn.init.normal_(self.mask_token, std=0.02)
-        
-    def random_mask_back(self,encoder_out,ids_restore):
-        '''
-        for random mask
-        '''
-        # [unmasked,masked] -> [B,L,d]
-        unmasked = self.init(encoder_out)
-        B,L_keep,_ = unmasked.shape
-        mask_tokens = self.mask_token.repeat(B, ids_restore.shape[1] + 1 - L_keep, 1)
-        x = torch.cat([unmasked[:,1:,:], mask_tokens], dim=1)
-        
-        # to original order
-        x = torch.gather(x, dim=1, index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]) )
-        
-        # append cls
-        x = torch.cat([unmasked[:, :1, :], x], dim=1)
-        
-        # fixed position embedding
-        x = self.position_emb(x,0,x.size(1))
-        return x
-        
-    def span_mask_back(self,encoder_out,mask):
-        '''
-        for span mask
-        '''
-        unmasked = self.init(encoder_out)
-        B, _, D = unmasked.shape
-        L = mask.shape[1]
-        
-        # start with all mask tokens (no CLS here)
-        x_full = self.mask_token.repeat(B, L, 1)  # (B, L, D)
-        
-        # positions of unmasked tokens (in original order)
-        ids_keep = torch.where(mask == 0)[1].view(B, -1)  # (B, L_keep)
-        
-        # scatter unmasked-tokens back to their original positions
-        kept_tokens = unmasked[:, 1:, :]  # (B, L_keep, D)
-        x_full.scatter_(dim=1, index=ids_keep.unsqueeze(-1).expand(-1, -1, D), src=kept_tokens)
-        
-        # append CLS back
-        x = torch.cat([unmasked[:, :1, :], x_full], dim=1) 
-        
-        # fixed position embedding
-        x = self.position_emb(x,0,x.size(1))
-        return x
-    
-    def forward(self,encoder_out,mask_or_ids_restore):
-        if self.mask_typ=='random':
-            x = self.random_mask_back(encoder_out,mask_or_ids_restore)
-            return x
-        elif self.mask_typ=='span':
-            x = self.span_mask_back(encoder_out,mask_or_ids_restore)
-            return x
-# -------------------------------------------------------------------------------------------------
-# Decoder
-# -------------------------------------------------------------------------------------------------     
-class TopoDecoder(nn.Module):
-    def __init__(self, dim, heads, stalk_dim, low_rank, dropout, num_layers, norm_typ):
-        super().__init__()
-        
-        self.layers = nn.ModuleList([ SheafTransformerLayer(dim, heads, stalk_dim, low_rank, norm_typ, dropout) for _ in range(num_layers) ])
-        
-    def forward(self,x):
-        for layer in self.layers:
-            x = layer(x)
-        return x
-
-
-# -------------------------------------------------------------------------------------------------
 # CoPresheaf Transformer Backbone
 # ------------------------------------------------------------------------------------------------- 
+def advance_released_ctnn_rng(para):
+    """Keep released CTNN seed initialization unchanged after removing unused modules."""
+    init = nn.Linear(para.encoder_h_dim, para.rng_h_dim)
+    token = torch.empty(1, 1, para.rng_h_dim)
+    nn.init.xavier_uniform_(init.weight)
+    nn.init.normal_(token, std=0.02)
+    for _ in range(para.rng_num_layers):
+        SheafTransformerLayer(
+            para.rng_h_dim,
+            para.rng_heads,
+            para.rng_stalk_dim,
+            para.low_rank,
+            para.norm_typ,
+            para.rng_dropout,
+        )
+    back = nn.Linear(para.rng_h_dim, para.combination*para.num_statis*para.patch_size)
+    nn.init.xavier_uniform_(back.weight)
+
+
 class CoPresheafBackbone(nn.Module):
     def __init__(self, para):
         super().__init__()
-        self.mask_typ = para.mask_typ
         self.patch_size = para.patch_size
-        self.topo_embed = TopoEmbeddings(para.combination,para.num_statis,para.encoder_h_dim,para.patch_size,para.max_len,para.mask_typ,para.mask_ratio)
+        self.topo_embed = TopoEmbeddings(para.combination,para.num_statis,para.encoder_h_dim,para.patch_size,para.max_len)
         self.encoder = TopoEncoder(para.encoder_h_dim,para.encoder_heads,para.encoder_stalk_dim,para.low_rank,para.encoder_dropout,para.encoder_num_layers,para.norm_typ)
-        # Retained only to preserve the initialization sequence of the released CTNN components.
-        self.decoder_init = DecoderInit(para.encoder_h_dim,para.decoder_h_dim,para.max_len,para.mask_typ)
-        self.decoder = TopoDecoder(para.decoder_h_dim,para.decoder_heads,para.decoder_stalk_dim,para.low_rank,para.decoder_dropout,para.decoder_num_layers,para.norm_typ)
-        self.back = nn.Linear(para.decoder_h_dim,para.combination*para.num_statis*para.patch_size)
-        
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        nn.init.xavier_uniform_(self.back.weight)
+        advance_released_ctnn_rng(para)
         
     def encode(self,topological_features):
         # prepare encoder input

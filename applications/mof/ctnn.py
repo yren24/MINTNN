@@ -27,6 +27,10 @@ torch.set_default_dtype(torch.float32)
 
 PROPERTY_DEFAULT = "O2uptakemolkg"
 TOPOLOGY_CHOICES = ["homology", "lap", "facet", "forman"]
+RELEASED_CTNN_RNG_H_DIM = 512
+RELEASED_CTNN_RNG_HEADS = 8
+RELEASED_CTNN_RNG_NUM_LAYERS = 3
+RELEASED_CTNN_RNG_DROPOUT = 0.1
 
 DEFAULT_FEATURE_ROOTS = {
     "homology": "data/mof/features/PH",
@@ -277,7 +281,7 @@ def prepare_fold(args, topologies, data=None, split_index=None):
 def build_para(args, x_shape, device):
     combination, num_filtrations, num_statis = x_shape
     encoder_stalk_dim = args.encoder_h_dim // args.encoder_heads
-    decoder_stalk_dim = args.decoder_h_dim // args.decoder_heads
+    rng_stalk_dim = RELEASED_CTNN_RNG_H_DIM // RELEASED_CTNN_RNG_HEADS
     return SimpleNamespace(
         combination=int(combination),
         num_filtrations=int(num_filtrations),
@@ -286,16 +290,14 @@ def build_para(args, x_shape, device):
         encoder_heads=int(args.encoder_heads),
         encoder_stalk_dim=int(encoder_stalk_dim),
         encoder_num_layers=int(args.encoder_num_layers),
-        decoder_h_dim=int(args.decoder_h_dim),
-        decoder_heads=int(args.decoder_heads),
-        decoder_stalk_dim=int(decoder_stalk_dim),
-        decoder_num_layers=int(args.decoder_num_layers),
+        rng_h_dim=RELEASED_CTNN_RNG_H_DIM,
+        rng_heads=RELEASED_CTNN_RNG_HEADS,
+        rng_stalk_dim=int(rng_stalk_dim),
+        rng_num_layers=RELEASED_CTNN_RNG_NUM_LAYERS,
         max_len=int(num_filtrations) + 1,
         low_rank=int(args.low_rank),
         encoder_dropout=float(args.encoder_dropout),
-        decoder_dropout=float(args.decoder_dropout),
-        mask_ratio=float(args.mask_ratio),
-        mask_typ=args.mask_typ,
+        rng_dropout=RELEASED_CTNN_RNG_DROPOUT,
         norm_typ=args.norm_typ,
         patch_size=int(args.patch_size),
         weight_decay=float(args.weight_decay),
@@ -646,9 +648,6 @@ def run_many_csca_splits(args):
             "encoder_h_dim": args.encoder_h_dim,
             "encoder_heads": args.encoder_heads,
             "encoder_num_layers": args.encoder_num_layers,
-            "decoder_h_dim": args.decoder_h_dim,
-            "decoder_heads": args.decoder_heads,
-            "decoder_num_layers": args.decoder_num_layers,
             "low_rank": args.low_rank,
             "patch_size": args.patch_size,
             "scaler": args.scaler,
@@ -697,14 +696,8 @@ def main():
     parser.add_argument("--encoder-h-dim", type=int, default=128)
     parser.add_argument("--encoder-heads", type=int, default=4)
     parser.add_argument("--encoder-num-layers", type=int, default=3)
-    parser.add_argument("--decoder-h-dim", type=int, default=512)
-    parser.add_argument("--decoder-heads", type=int, default=8)
-    parser.add_argument("--decoder-num-layers", type=int, default=3)
     parser.add_argument("--low-rank", type=int, default=8)
     parser.add_argument("--encoder-dropout", type=float, default=0.1)
-    parser.add_argument("--decoder-dropout", type=float, default=0.1)
-    parser.add_argument("--mask-ratio", type=float, default=0.5)
-    parser.add_argument("--mask-typ", choices=["random", "span"], default="span")
     parser.add_argument("--norm-typ", choices=["pre_norm", "post_norm"], default="post_norm")
     parser.add_argument("--patch-size", type=int, default=1)
     parser.add_argument("--scaler", choices=["minmax", "standard"], default="minmax")

@@ -139,9 +139,6 @@ def apply_mof_final_defaults(command, passthrough, app, architecture, topology):
         add_option(command, passthrough, "--encoder-h-dim", row.get("encoder_h_dim"), integer=True)
         add_option(command, passthrough, "--encoder-heads", row.get("encoder_heads"), integer=True)
         add_option(command, passthrough, "--encoder-num-layers", row.get("encoder_num_layers"), integer=True)
-        add_option(command, passthrough, "--decoder-h-dim", row.get("decoder_h_dim"), integer=True)
-        add_option(command, passthrough, "--decoder-heads", row.get("decoder_heads"), integer=True)
-        add_option(command, passthrough, "--decoder-num-layers", row.get("decoder_num_layers"), integer=True)
         add_option(command, passthrough, "--low-rank", row.get("low_rank"), integer=True)
         add_option(command, passthrough, "--patch-size", row.get("patch_size"), integer=True)
 
