@@ -42,4 +42,3 @@ data/
         └── FPRC/
 ```
 
-If the Google Drive folder is used for public release, set sharing to `Anyone with the link` with viewer access.
