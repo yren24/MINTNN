@@ -96,7 +96,7 @@ def default_tag_for_feature(feature: str, preset: str) -> str:
             "facet": "CA",
             "lap": "PL",
             "forman": "FPRC",
-            "curvature": "EIC_BI",
+            "curvature": "EIC/bidirectional",
         }[feature]
     if preset in {"step01_bond0", "0.1_bond0"}:
         if feature == "homology":
@@ -114,7 +114,17 @@ def default_tag_for_feature(feature: str, preset: str) -> str:
 
 
 def feature_folder(root: Path, feature: str, tag: str, split: str) -> Path:
-    return root / "topology_features" / tag / feature / split
+    path = root / "topology_features" / tag / feature / split
+    if path.is_dir() or feature != "curvature":
+        return path
+    legacy_tag = {
+        "EIC/bidirectional": "EIC_BI",
+        "EIC/single_direction": "EIC",
+    }.get(tag)
+    if legacy_tag is None:
+        return path
+    legacy_path = root / "topology_features" / legacy_tag / feature / split
+    return legacy_path if legacy_path.is_dir() else path
 
 
 def feature_to_model_axes(arr, source_name="feature") -> np.ndarray:

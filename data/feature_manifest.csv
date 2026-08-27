@@ -6,6 +6,6 @@ mof,O2 and N2,FPRC,data/mof/features/FPRC,MINTNN_MOF_final_features.zip,Forman-P
 ld50,LD50,PH,data/ld50/topology_features/PH,MINTNN_LD50_final_features.zip,persistent homology features
 ld50,LD50,PL,data/ld50/topology_features/PL,MINTNN_LD50_final_features.zip,persistent Laplacian features
 ld50,LD50,CA,data/ld50/topology_features/CA,MINTNN_LD50_final_features.zip,facet features
-ld50,LD50,EIC,data/ld50/topology_features/EIC,MINTNN_LD50_final_features.zip,element interactive curvature features
-ld50,LD50,EIC_BI,data/ld50/topology_features/EIC_BI,MINTNN_LD50_final_features.zip,birth-indexed element interactive curvature features
+ld50,LD50,EIC,data/ld50/topology_features/EIC/single_direction,MINTNN_LD50_final_features.zip,element interactive curvature features for LD50 CNN and SNN
+ld50,LD50,EIC,data/ld50/topology_features/EIC/bidirectional,MINTNN_LD50_final_features.zip,element interactive curvature features for LD50 ANN and CTNN
 ld50,LD50,FPRC,data/ld50/topology_features/FPRC,MINTNN_LD50_final_features.zip,Forman-Persistent Ricci curvature features

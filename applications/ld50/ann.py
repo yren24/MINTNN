@@ -99,7 +99,7 @@ def default_tag_for_feature(feature: str, bond: str) -> str:
             "facet": "CA",
             "lap": "PL",
             "forman": "FPRC",
-            "curvature": "EIC_BI",
+            "curvature": "EIC/bidirectional",
         }[feature]
     if bond == "0":
         return "maxfil10_bond0_facetdim1" if feature == "facet" else "maxfil10_bond0"
@@ -109,7 +109,17 @@ def default_tag_for_feature(feature: str, bond: str) -> str:
 
 
 def feature_folder(root: Path, feature: str, tag: str) -> Path:
-    return root / "topology_features" / tag / feature
+    path = root / "topology_features" / tag / feature
+    if path.is_dir() or feature != "curvature":
+        return path
+    legacy_tag = {
+        "EIC/bidirectional": "EIC_BI",
+        "EIC/single_direction": "EIC",
+    }.get(tag)
+    if legacy_tag is None:
+        return path
+    legacy_path = root / "topology_features" / legacy_tag / feature
+    return legacy_path if legacy_path.is_dir() else path
 
 
 def get_feature_label(root: Path, feature_specs: Sequence[Tuple[str, str]]):

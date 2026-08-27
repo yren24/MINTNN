@@ -16,9 +16,17 @@ invariants:
   EIC:
     path: data/ld50/topology_features/EIC
     topology_key: curvature
-  EIC_BI:
-    path: data/ld50/topology_features/EIC_BI
-    topology_key: curvature
+    encodings:
+      single_direction:
+        path: data/ld50/topology_features/EIC/single_direction
+        used_by:
+          - CNN
+          - SNN
+      bidirectional:
+        path: data/ld50/topology_features/EIC/bidirectional
+        used_by:
+          - ANN
+          - CTNN
   FPRC:
     path: data/ld50/topology_features/FPRC
     topology_key: forman
@@ -28,5 +36,5 @@ architectures:
   SNN: applications/ld50/snn.py
   CTNN: applications/ld50/ctnn.py
 notes:
-  - EIC_BI is kept as a separate released feature group because it is used by selected LD50 components.
+  - EIC has two released encodings. The dispatcher selects the final encoding from the architecture.
   - Component-level hyperparameter sweeps and retained model summaries are documented in metadata/.

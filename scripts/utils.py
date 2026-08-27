@@ -12,8 +12,11 @@ INVARIANT_TO_TOPOLOGY = {
     "PL": "lap",
     "CA": "facet",
     "EIC": "curvature",
-    "EIC_BI": "curvature",
     "FPRC": "forman",
+}
+
+LEGACY_INVARIANT_ALIASES = {
+    "EIC_BI": "EIC",
 }
 
 MOF_TARGETS = {
@@ -39,14 +42,13 @@ APPLICATION_SCRIPTS = {
 }
 
 MOF_INVARIANTS = {"PH", "PL", "CA", "FPRC"}
-LD50_INVARIANTS = {"PH", "PL", "CA", "EIC", "EIC_BI", "FPRC"}
+LD50_INVARIANTS = {"PH", "PL", "CA", "EIC", "FPRC"}
 
 DEFAULT_LD50_SNN_LR = {
     "PH": "8e-4",
     "PL": "8e-4",
     "CA": "8e-4",
     "EIC": "8e-4",
-    "EIC_BI": "8e-4",
     "FPRC": "8e-4",
 }
 
@@ -64,6 +66,7 @@ def normalize_application(value: str) -> str:
 
 def normalize_invariant(value: str) -> str:
     invariant = value.strip().upper().replace("-", "_")
+    invariant = LEGACY_INVARIANT_ALIASES.get(invariant, invariant)
     if invariant not in INVARIANT_TO_TOPOLOGY:
         raise ValueError(f"Unsupported invariant: {value}")
     return invariant

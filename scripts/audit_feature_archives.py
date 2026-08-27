@@ -24,12 +24,24 @@ MOF_FEATURES = [
 ]
 
 LD50_FEATURES = [
-    ("CA", "facet"),
-    ("EIC", "curvature"),
-    ("EIC_BI", "curvature"),
-    ("FPRC", "forman"),
-    ("PH", "homology"),
-    ("PL", "lap"),
+    ("CA/facet", ["data/ld50/topology_features/CA/facet/{split}/"]),
+    (
+        "EIC/single_direction/curvature",
+        [
+            "data/ld50/topology_features/EIC/single_direction/curvature/{split}/",
+            "data/ld50/topology_features/EIC/curvature/{split}/",
+        ],
+    ),
+    (
+        "EIC/bidirectional/curvature",
+        [
+            "data/ld50/topology_features/EIC/bidirectional/curvature/{split}/",
+            "data/ld50/topology_features/EIC_BI/curvature/{split}/",
+        ],
+    ),
+    ("FPRC/forman", ["data/ld50/topology_features/FPRC/forman/{split}/"]),
+    ("PH/homology", ["data/ld50/topology_features/PH/homology/{split}/"]),
+    ("PL/lap", ["data/ld50/topology_features/PL/lap/{split}/"]),
 ]
 
 
@@ -141,15 +153,19 @@ def audit_ld50(ld50_zip: Path) -> dict:
             ids = [row["filename"].strip() for row in rows if row.get("filename", "").strip()]
 
             feature_results = {}
-            for family, topology in LD50_FEATURES:
-                prefix = f"data/ld50/topology_features/{family}/{topology}/{split}/"
-                feature_files = [path for path in names if path.startswith(prefix) and path.endswith(".npy")]
+            for feature_name, prefix_templates in LD50_FEATURES:
+                prefixes = [template.format(split=split) for template in prefix_templates]
+                feature_files = [
+                    path
+                    for path in names
+                    if any(path.startswith(prefix) for prefix in prefixes) and path.endswith(".npy")
+                ]
                 index = build_cas_index(feature_files)
                 missing = []
                 ambiguous = []
                 for name in ids:
-                    exact = f"{prefix}{name}.npy"
-                    if exact in names:
+                    exact_matches = [f"{prefix}{name}.npy" for prefix in prefixes]
+                    if any(exact in names for exact in exact_matches):
                         continue
                     key = normalized_cas_key(name)
                     candidates = index.get(key, []) if key is not None else []
@@ -159,10 +175,16 @@ def audit_ld50(ld50_zip: Path) -> dict:
                         ambiguous.append({"name": name, "candidates": candidates[:5]})
                     else:
                         missing.append(name)
-                feature_results[f"{family}/{topology}"] = {
+                source_prefixes = [
+                    prefix
+                    for prefix in prefixes
+                    if any(path.startswith(prefix) and path.endswith(".npy") for path in names)
+                ]
+                feature_results[feature_name] = {
                     "labels": len(ids),
                     "missing": len(missing),
                     "ambiguous": len(ambiguous),
+                    "source_prefix": source_prefixes[0] if source_prefixes else None,
                     "missing_examples": missing[:5],
                     "ambiguous_examples": ambiguous[:2],
                 }

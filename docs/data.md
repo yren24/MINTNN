@@ -54,10 +54,10 @@ data/ld50/
     PL/lap/test/*.npy
     FPRC/forman/train/*.npy
     FPRC/forman/test/*.npy
-    EIC/curvature/train/*.npy
-    EIC/curvature/test/*.npy
-    EIC_BI/curvature/train/*.npy
-    EIC_BI/curvature/test/*.npy
+    EIC/single_direction/curvature/train/*.npy
+    EIC/single_direction/curvature/test/*.npy
+    EIC/bidirectional/curvature/train/*.npy
+    EIC/bidirectional/curvature/test/*.npy
 ```
 
 The LD50 CSV files must contain `filename` and `label` columns.

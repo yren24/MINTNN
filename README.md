@@ -62,7 +62,9 @@ unzip MINTNN_MOF_final_features.zip
 unzip MINTNN_LD50_final_features.zip
 ```
 
-This should create the `data/mof/` and `data/ld50/` directories shown above. The application scripts use these compact feature family names directly: `PH`, `PL`, `CA`, `EIC`, `EIC_BI`, and `FPRC`.
+This should create the `data/mof/` and `data/ld50/` directories shown above. The application scripts use these compact feature family names directly: `PH`, `PL`, `CA`, `EIC`, and `FPRC`.
+
+For LD50, `EIC` denotes the element-interactive curvature family. The dispatcher automatically selects the final EIC encoding used by each architecture: ANN and CTNN use the bidirectional EIC encoding, while CNN and SNN use the single-direction EIC encoding.
 
 To verify a downloaded feature package before training:
 
@@ -85,7 +87,7 @@ application + invariant + architecture
 Examples:
 
 ```text
-LD50 + EIC_BI + CTNN
+LD50 + EIC + CTNN
 MOF O2 + CA + CNN
 MOF N2 + FPRC + GBT
 ```
@@ -95,7 +97,7 @@ The helper dispatcher in `scripts/train.py` builds the appropriate application c
 ```bash
 python scripts/train.py \
     --application ld50 \
-    --invariant EIC_BI \
+    --invariant EIC \
     --architecture CTNN
 ```
 

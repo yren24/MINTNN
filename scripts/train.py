@@ -31,6 +31,8 @@ ARCH_TO_MODEL = {
     "CTNN": "copresheaf",
 }
 
+CURVATURE_BIDIRECTIONAL_ARCHES = {"ANN", "CTNN"}
+
 
 def read_csv_rows(path):
     with path.open(newline="", encoding="utf-8") as fp:
@@ -77,22 +79,30 @@ def final_row_for_mof(app, architecture, topology):
     return None
 
 
-def final_row_for_ld50(architecture, topology, invariant):
+def final_row_for_ld50(architecture, topology):
     path = REPO_ROOT / "metadata" / "ld50_final_20_models.csv"
     family = "Copresheaf" if architecture == "CTNN" else architecture
-    feature_tag = "curvbi" if invariant == "EIC_BI" else None
+    needs_bidirectional = topology == "curvature" and architecture in CURVATURE_BIDIRECTIONAL_ARCHES
     for row in read_csv_rows(path):
         if row.get("nn_family") != family or row.get("topology") != topology:
             continue
         tag = row.get("feature_tag", "")
         if topology == "curvature":
             has_curvbi = "curvbi" in tag
-            if feature_tag == "curvbi" and not has_curvbi:
+            if needs_bidirectional and not has_curvbi:
                 continue
-            if feature_tag is None and has_curvbi:
+            if not needs_bidirectional and has_curvbi:
                 continue
         return row
     return None
+
+
+def ld50_feature_root_tag(architecture, topology, invariant):
+    if topology != "curvature":
+        return invariant
+    if architecture in CURVATURE_BIDIRECTIONAL_ARCHES:
+        return "EIC/bidirectional"
+    return "EIC/single_direction"
 
 
 def apply_mof_final_defaults(command, passthrough, app, architecture, topology):
@@ -136,8 +146,8 @@ def apply_mof_final_defaults(command, passthrough, app, architecture, topology):
         add_option(command, passthrough, "--patch-size", row.get("patch_size"), integer=True)
 
 
-def apply_ld50_final_defaults(command, passthrough, architecture, topology, invariant):
-    row = final_row_for_ld50(architecture, topology, invariant)
+def apply_ld50_final_defaults(command, passthrough, architecture, topology):
+    row = final_row_for_ld50(architecture, topology)
     if row is None:
         return
 
@@ -203,14 +213,15 @@ def build_command(args: argparse.Namespace, passthrough: list[str]) -> list[str]
         if args.final_defaults:
             apply_mof_final_defaults(command, passthrough, app, architecture, topology)
     else:
+        feature_root_tag = ld50_feature_root_tag(architecture, topology, invariant)
         if architecture == "SNN":
-            command.extend(["--method", topology, "--feature-root-tag", invariant])
+            command.extend(["--method", topology, "--feature-root-tag", feature_root_tag])
             if not args.final_defaults and not has_option(passthrough, "--lr"):
                 command.extend(["--lr", DEFAULT_LD50_SNN_LR[invariant]])
         else:
-            command.extend(["--features", topology, "--feature-root-tag", invariant])
+            command.extend(["--features", topology, "--feature-root-tag", feature_root_tag])
         if args.final_defaults:
-            apply_ld50_final_defaults(command, passthrough, architecture, topology, invariant)
+            apply_ld50_final_defaults(command, passthrough, architecture, topology)
 
     command.extend(passthrough)
     return command
@@ -224,7 +235,7 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
         )
     )
     parser.add_argument("--application", required=True, help="mof_o2, mof_n2, mof, or ld50")
-    parser.add_argument("--invariant", required=True, help="PH, PL, CA, EIC, EIC_BI, or FPRC")
+    parser.add_argument("--invariant", required=True, help="PH, PL, CA, EIC, or FPRC")
     parser.add_argument("--architecture", required=True, help="ANN, CNN, SNN, CTNN, or GBT")
     parser.add_argument("--no-final-defaults", dest="final_defaults", action="store_false", help="Use application script defaults instead of metadata final-component settings.")
     parser.set_defaults(final_defaults=True)

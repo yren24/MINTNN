@@ -39,7 +39,6 @@ data/
         ├── PL/
         ├── CA/
         ├── EIC/
-        ├── EIC_BI/
         └── FPRC/
 ```
 

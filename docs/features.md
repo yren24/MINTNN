@@ -31,7 +31,9 @@ pair rule = a in base, b in all, element_order[a] < element_order[b]
 | CA/facet | `CA` | 100 x 30 x 2 | 30 x 100 x 2 |
 | PL | `PL` | 100 x 30 x 8 | 30 x 100 x 8 |
 | FPRC/Forman | `FPRC` | 100 x 30 x 20 | 30 x 100 x 20 |
-| EIC/curvature | `EIC` | 49 x 30 x 10 | 30 x 49 x 10 |
-| EIC/curvature bidirectional | `EIC_BI` | 49 x 30 x 20 | 30 x 49 x 20 |
+| EIC/curvature, single-direction encoding | `EIC` | 49 x 30 x 10 | 30 x 49 x 10 |
+| EIC/curvature, bidirectional encoding | `EIC` | 49 x 30 x 20 | 30 x 49 x 20 |
 
 The final LD50 setting uses maximum filtration 10, step 0.1, and `bond_delta=0`, with covalent bonds removed from the modified filtration matrix.
+
+The two EIC rows are encoding variants of the same invariant family, not separate mathematical invariants. `scripts/train.py` selects the correct final encoding from the architecture: ANN/CTNN use the bidirectional encoding, and CNN/SNN use the single-direction encoding.
