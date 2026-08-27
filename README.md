@@ -1,12 +1,32 @@
 # MINTNN
 
-## Mathematical Invariant-Enabled Topological Neural Networks
+## Overview
 
-**MINTNN** is a molecular and materials learning framework that couples multiscale mathematical invariant representations with neural network architectures. The repository provides the code used to evaluate how complementary topological and geometric descriptors interact with different neural processing mechanisms.
+**MINTNN** is a molecular and materials learning framework for studying how multiscale mathematical invariant representations interact with neural processing mechanisms. It maps three-dimensional molecular and materials structures to mathematical domains such as bipartite graphs, simplicial complexes, and differentiable manifolds; constructs complementary invariant families including persistent homology, persistent Laplacian, commutative-algebraic descriptors, element-interactive curvature, and Forman persistent Ricci curvature; and pairs these features with ANN, CNN, SNN, and CTNN architectures. This release focuses on the MOF gas-uptake and LD50 toxicity applications, including precomputed features, final component settings, training scripts, and consensus utilities.
 
 <p align="center">
   <img src="assets/mintnn_workflow.png" alt="MINTNN workflow" width="78%">
 </p>
+
+## Repository Structure
+
+```text
+MINTNN/
+|-- applications/
+|   |-- ld50/              # LD50 toxicity component training scripts
+|   |-- mof/               # MOF gas-uptake component training scripts
+|   `-- common/            # Shared neural-network modules
+|-- assets/                # Workflow figure used by the README
+|-- configs/               # Application-level component and consensus settings
+|-- data/                  # Feature manifest and expected downloaded feature layout
+|-- docs/                  # Additional notes on data, features, architectures, and environment
+|-- metadata/              # Machine-readable final model settings and reported metrics
+|-- scripts/               # Training dispatcher, evaluation, consensus, and audit utilities
+|-- src/mintnn/            # Reusable architecture definitions
+|-- environment.yml
+|-- requirements.txt
+`-- README.md
+```
 
 ## Precomputed Feature Download
 
@@ -171,3 +191,15 @@ python scripts/consensus.py \
 ```
 
 The consensus script aligns samples by name, checks target consistency, averages component predictions, and writes both consensus predictions and metrics.
+
+## Citation
+
+If you use this repository, please cite the MINTNN manuscript:
+
+```bibtex
+@misc{ren2026mintnn,
+  title  = {MINTNN: Mathematical Invariant-Enabled Topological Neural Networks for Molecular and Materials Property Prediction},
+  author = {Ren, Yiming and Liu, Xiang and Hajij, Mustafa and Lio, Pietro and Wei, Guo-Wei},
+  year   = {2026}
+}
+```

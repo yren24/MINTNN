@@ -463,15 +463,16 @@ class TopoDecoder(nn.Module):
 
 
 # -------------------------------------------------------------------------------------------------
-# Masked CoPresheaf Transformer Pretrain
+# CoPresheaf Transformer Backbone
 # ------------------------------------------------------------------------------------------------- 
-class Pretrain(nn.Module):
+class CoPresheafBackbone(nn.Module):
     def __init__(self, para):
         super().__init__()
         self.mask_typ = para.mask_typ
         self.patch_size = para.patch_size
         self.topo_embed = TopoEmbeddings(para.combination,para.num_statis,para.encoder_h_dim,para.patch_size,para.max_len,para.mask_typ,para.mask_ratio)
         self.encoder = TopoEncoder(para.encoder_h_dim,para.encoder_heads,para.encoder_stalk_dim,para.low_rank,para.encoder_dropout,para.encoder_num_layers,para.norm_typ)
+        # Retained only to preserve the initialization sequence of the released CTNN components.
         self.decoder_init = DecoderInit(para.encoder_h_dim,para.decoder_h_dim,para.max_len,para.mask_typ)
         self.decoder = TopoDecoder(para.decoder_h_dim,para.decoder_heads,para.decoder_stalk_dim,para.low_rank,para.decoder_dropout,para.decoder_num_layers,para.norm_typ)
         self.back = nn.Linear(para.decoder_h_dim,para.combination*para.num_statis*para.patch_size)
@@ -480,53 +481,6 @@ class Pretrain(nn.Module):
 
     def reset_parameters(self):
         nn.init.xavier_uniform_(self.back.weight)
-    
-    def patchy(self,topological_features):
-        B, combination, L, num_statis = topological_features.shape
-        x = topological_features.reshape(B,combination,L//self.patch_size,self.patch_size,num_statis)
-        x = x.permute(0,2,3,4,1).contiguous()
-        x = x.reshape(B,L//self.patch_size,self.patch_size*num_statis*combination)
-        return x
-    
-    def forward_loss(self,topological_features,pred,mask,norm_pix_loss=True,loss_on_patches='on_removed_patches'):
-        target = self.patchy(topological_features)
-        if norm_pix_loss:
-            mean = target.mean(dim=-1, keepdim=True)
-            var = target.var(dim=-1, keepdim=True)
-            target = (target - mean) / (var + 1.0e-6) ** 0.5
-
-        loss = (pred - target) ** 2
-        loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
-        
-        if loss_on_patches == 'on_removed_patches':
-            loss = (loss * mask).sum() / mask.sum()  # mean loss on removed patches
-        elif loss_on_patches == 'on_all_patches':
-            loss = loss.mean()  # mean loss on all patches
-        return loss
-    
-    def forward(self,topological_features):
-        # prepare encoder input
-        x,mask,ids_restore = self.topo_embed(topological_features)
-        
-        # encoder
-        encoder_out = self.encoder(x)
-        
-        
-        # prepare decoder input
-        if self.mask_typ=='random':
-            decoder_in = self.decoder_init(encoder_out,ids_restore)
-        elif self.mask_typ=='span':
-            decoder_in = self.decoder_init(encoder_out,mask) 
-        # decoder
-        decoder_out = self.decoder(decoder_in)    
-        # remove cls
-        out = decoder_out[:,1:,:]
-        # project to original dim for reconstruct
-        pred = self.back(out)
-        
-        # loss
-        loss = self.forward_loss(topological_features,pred,mask)
-        return loss
         
     def encode(self,topological_features):
         # prepare encoder input
@@ -542,23 +496,16 @@ class Pretrain(nn.Module):
 # Finetune
 # -------------------------------------------------------------------------------------------------
 class Finetune(nn.Module):
-    def __init__(self, para, model_path, use_pretrain=True, freeze_encoder=False):
+    def __init__(self, para):
         super().__init__()
         self.dim = para.encoder_h_dim
-        pretrained = Pretrain(para)
-        if use_pretrain:
-            state = torch.load(model_path, map_location="cpu",weights_only=False)
-            pretrained.load_state_dict(state['model'], strict=True)
-        self.backbone = pretrained
+        self.backbone = CoPresheafBackbone(para)
         
         self.fc = nn.Sequential(
             nn.Linear(para.encoder_h_dim, para.encoder_h_dim*2),
             nn.ReLU(),
             nn.Linear(para.encoder_h_dim*2, 1)
         )
-        if freeze_encoder:
-            for p in self.backbone.parameters():
-                p.requires_grad = False
     
     def forward(self,topological_features,pool='cls'):
         x = self.backbone.encode(topological_features)
@@ -571,55 +518,6 @@ class Finetune(nn.Module):
         x = x.view(-1,self.dim) 
         x = self.fc(x)         
         return x  
-
-
-class FinetuneNewRank(nn.Module):
-    def __init__(self, para, model_path, new_low_rank, use_pretrain=True, freeze_encoder=False):
-        super().__init__()
-        self.dim = para.encoder_h_dim
-        
-        pretrained = Pretrain(para)
-        
-        if use_pretrain:
-            state = torch.load(model_path, map_location="cpu", weights_only=False)
-            pretrained.load_state_dict(state['model'], strict=True)
-            
-        self.backbone = pretrained
-        
-     
-        for layer in self.backbone.encoder.layers:
-            layer.sheaf_transform = SheafValueTransformNonlinear(
-                D=para.encoder_h_dim,
-                H=para.encoder_heads,
-                d=para.encoder_stalk_dim,
-                r=new_low_rank,  
-                bias=True
-            )
-        
-        if freeze_encoder:
-            for p in self.backbone.parameters():
-                p.requires_grad = False
-                
-  
-        self.fc = nn.Sequential(
-            nn.Linear(para.encoder_h_dim, para.encoder_h_dim * 2),
-            nn.ReLU(),
-            nn.Linear(para.encoder_h_dim * 2, 1)
-        )
-    
-    def forward(self, topological_features, pool='cls'):
-        x = self.backbone.encode(topological_features)
-        
-        if pool == 'cls':
-            x = x[:, 0, :]
-        elif pool == 'average':
-            x = x.mean(dim=1) 
-        else:
-            x = x[:, 0, :]
-            
-        x = x.view(-1, self.dim) 
-        x = self.fc(x)         
-        return x
         
         
         

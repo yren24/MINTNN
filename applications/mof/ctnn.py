@@ -369,7 +369,7 @@ def run_one(args, topologies=None, data=None, split_index=None, write_outputs=Tr
     if para.num_filtrations % para.patch_size != 0:
         raise ValueError(f"num_filtrations={para.num_filtrations} must be divisible by patch_size={para.patch_size}")
 
-    model = Finetune(para, model_path=args.model_path, use_pretrain=args.use_pretrain, freeze_encoder=args.freeze_encoder).to(device)
+    model = Finetune(para).to(device)
     criterion = nn.MSELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
@@ -707,9 +707,6 @@ def main():
     parser.add_argument("--mask-typ", choices=["random", "span"], default="span")
     parser.add_argument("--norm-typ", choices=["pre_norm", "post_norm"], default="post_norm")
     parser.add_argument("--patch-size", type=int, default=1)
-    parser.add_argument("--model-path", default="", help="Optional pretrained copresheaf checkpoint path.")
-    parser.add_argument("--use-pretrain", action="store_true", help="Load --model-path into the copresheaf backbone.")
-    parser.add_argument("--freeze-encoder", action="store_true")
     parser.add_argument("--scaler", choices=["minmax", "standard"], default="minmax")
     parser.add_argument("--csca-global-x-scaler", dest="csca_global_x_scaler", action="store_true", default=True)
     parser.add_argument("--no-csca-global-x-scaler", dest="csca_global_x_scaler", action="store_false")
@@ -721,9 +718,6 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Load features and print shapes without training.")
     parser.add_argument("--device", default=None)
     args = parser.parse_args()
-
-    if args.use_pretrain and not args.model_path:
-        raise ValueError("--use-pretrain requires --model-path")
 
     run_many_csca_splits(args)
 
