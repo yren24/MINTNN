@@ -14,8 +14,7 @@
 MINTNN/
 |-- applications/
 |   |-- ld50/              # LD50 toxicity component training scripts
-|   |-- mof/               # MOF gas-uptake component training scripts
-|   `-- common/            # Shared neural-network modules
+|   `-- mof/               # MOF gas-uptake scripts and MOF CTNN model
 |-- assets/                # Workflow figure used by the README
 |-- configs/               # Application-level component and consensus settings
 |-- data/                  # Feature manifest and expected downloaded feature layout

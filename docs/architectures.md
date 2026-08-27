@@ -54,4 +54,4 @@ topological feature patches -> positional embedding + CLS token
 -> low-rank sheaf transformer blocks -> regression head
 ```
 
-The final LD50 CTNN uses `pre_norm`, `pooling=cls_mean_max`, `low_rank=8`, `encoder_heads=4`, and three encoder layers. The shared CoPresheaf backbone used by application scripts is stored in `applications/common/copresheaf_model.py`.
+The final LD50 CTNN uses `pre_norm`, `pooling=cls_mean_max`, `low_rank=8`, `encoder_heads=4`, and three encoder layers. The MOF CoPresheaf backbone used by the MOF CTNN script is stored in `applications/mof/copresheaf_model.py`.

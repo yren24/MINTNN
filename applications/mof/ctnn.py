@@ -4,7 +4,6 @@ import csv
 import json
 import os
 import random
-import sys
 from types import SimpleNamespace
 
 import numpy as np
@@ -14,11 +13,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from torch.utils.data import DataLoader, Dataset
 
-COMMON_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "common"))
-if COMMON_DIR not in sys.path:
-    sys.path.insert(0, COMMON_DIR)
-
-from copresheaf_model import Finetune  # noqa: E402
+from copresheaf_model import Finetune
 from ann import inverse_target, parse_topologies, set_seed, split_indices  # noqa: E402
 from gbt import load_dataset  # noqa: E402
 
