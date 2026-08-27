@@ -112,6 +112,7 @@ def apply_mof_final_defaults(command, passthrough, app, architecture, topology):
     if row is None:
         return
 
+    add_option(command, passthrough, "--split-style", "csca")
     add_option(command, passthrough, "--lr", row.get("lr"))
     add_option(command, passthrough, "--epochs", row.get("epochs"), integer=True)
     add_option(command, passthrough, "--batch-size", row.get("batch_size"), integer=True)

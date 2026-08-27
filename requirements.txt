@@ -1,5 +1,6 @@
 # Direct runtime dependencies for the public MINTNN scripts.
 # Conda environment.yml is recommended for full GPU/SNN reproduction.
+# This pip list is a fallback and does not pin CUDA-specific wheels.
 numpy==1.26.4
 scipy>=1.10
 scikit-learn==1.3.2
