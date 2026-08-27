@@ -87,7 +87,6 @@ unzip MINTNN_LD50_final_features.zip
 
 This should create the `data/mof/` and `data/ld50/` directories shown above. The application scripts use these compact feature family names directly: `PH`, `PL`, `CA`, `EIC`, and `FPRC`.
 
-For LD50, `EIC` denotes the element-interactive curvature family. The dispatcher automatically selects the final EIC encoding used by each architecture: ANN and CTNN use the bidirectional EIC encoding, while CNN and SNN use the single-direction EIC encoding.
 
 To verify a downloaded feature package before training:
 
