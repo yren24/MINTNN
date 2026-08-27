@@ -25,5 +25,4 @@ After creating an environment, verify it with:
 
 ```bash
 python scripts/check_environment.py
-python scripts/check_environment.py --include-snn
 ```

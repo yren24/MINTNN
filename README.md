@@ -55,7 +55,6 @@ After installation, verify the environment with:
 
 ```bash
 python scripts/check_environment.py
-python scripts/check_environment.py --include-snn
 ```
 
 ## Preparing the Data

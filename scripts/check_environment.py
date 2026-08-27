@@ -8,15 +8,12 @@ import importlib
 import sys
 
 
-CORE_MODULES = [
+REQUIRED_MODULES = [
     ("numpy", "NumPy"),
     ("scipy", "SciPy"),
     ("sklearn", "scikit-learn"),
     ("torch", "PyTorch"),
     ("pandas", "pandas"),
-]
-
-SNN_MODULES = [
     ("torch_geometric", "PyTorch Geometric"),
 ]
 
@@ -34,12 +31,11 @@ def check_module(module_name: str, label: str) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--include-snn", action="store_true", help="Also require PyTorch Geometric for SNN components.")
-    args = parser.parse_args()
+    parser.parse_args()
 
     print(f"python: {sys.executable}")
     ok = True
-    for module_name, label in CORE_MODULES:
+    for module_name, label in REQUIRED_MODULES:
         ok = check_module(module_name, label) and ok
 
     try:
@@ -52,10 +48,6 @@ def main() -> int:
         if torch.cuda.is_available():
             print(f"torch.cuda.device_count: {torch.cuda.device_count()}")
             print(f"torch.cuda.device_name.0: {torch.cuda.get_device_name(0)}")
-
-    if args.include_snn:
-        for module_name, label in SNN_MODULES:
-            ok = check_module(module_name, label) and ok
 
     return 0 if ok else 1
 
