@@ -48,9 +48,11 @@ conda activate mintnn
 For Linux GPU or HPCC reproduction with CUDA 12.1 and PyTorch 2.4.1:
 
 ```bash
-conda env create -f environment-hpcc-cu121.yml
+conda env create -f envs/environment-hpcc-cu121.yml
 conda activate mintnn-cu121
 ```
+
+This HPCC/CUDA environment is the recommended choice for running all released architecture families, including SNN.
 
 Alternatively, install the Python requirements into an existing environment:
 
@@ -62,7 +64,7 @@ The SNN components require PyTorch Geometric. For CUDA-specific installations, u
 
 ```text
 docs/environment.md
-requirements-hpcc-cu121.txt
+envs/requirements-hpcc-cu121.txt
 ```
 
 After installation, verify the environment with:

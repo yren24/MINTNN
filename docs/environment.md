@@ -7,8 +7,8 @@ NumPy, SciPy, scikit-learn, PyTorch, pandas, and PyTorch Geometric.
 
 - `requirements.txt` lists direct runtime dependencies for the public scripts.
 - `environment.yml` is a portable Conda environment for CPU or user-managed CUDA installs.
-- `environment-hpcc-cu121.yml` is the recommended Linux GPU environment for reproducing the released runs with PyTorch 2.4.1 and CUDA 12.1.
-- `requirements-hpcc-cu121.txt` preserves the pip-compiled CUDA 12.1 reference lock from the original `embed_nn` workspace and adds the public-release utilities.
+- `envs/environment-hpcc-cu121.yml` is the recommended Linux GPU environment for reproducing the released runs with PyTorch 2.4.1 and CUDA 12.1.
+- `envs/requirements-hpcc-cu121.txt` preserves the pip-compiled CUDA 12.1 reference lock from the original `embed_nn` workspace and adds the public-release utilities.
 
 ## Architecture-Specific Notes
 
@@ -21,6 +21,8 @@ PyTorch 2.4.1
 CUDA 12.1
 PyTorch Geometric >= 2.4
 ```
+
+For full HPCC reproduction across all released architecture families, use `envs/environment-hpcc-cu121.yml`.
 
 After creating an environment, verify it with:
 
