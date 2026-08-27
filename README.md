@@ -45,8 +45,6 @@ conda env create -f environment.yml
 conda activate mintnn
 ```
 
-The environment file supports all released architecture families and is the recommended setup for full reproduction.
-
 Alternatively, install the Python requirements into an existing environment:
 
 ```bash
