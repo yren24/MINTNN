@@ -52,6 +52,7 @@ def run_seed(seed, args, config, train_data, test_data, line_edge_index, first_d
     snn.set_seed(seed)
     device = torch.device(args.device if args.device else ("cuda" if torch.cuda.is_available() else "cpu"))
     train_loader = snn.make_loader(train_data, args.batch_size, True, args.num_workers, seed)
+    train_eval_loader = snn.make_loader(train_data, args.batch_size, False, args.num_workers, seed)
     test_loader = snn.make_loader(test_data, args.batch_size, False, args.num_workers, seed)
     mlp_hidden = args.mlp_hidden if args.mlp_hidden is not None else max(256, args.h_dim * 2)
 
@@ -93,7 +94,7 @@ def run_seed(seed, args, config, train_data, test_data, line_edge_index, first_d
             flush=True,
         )
 
-    train_true, train_pred, train_names = predict(model, train_loader, line_edge_index, device)
+    train_true, train_pred, train_names = predict(model, train_eval_loader, line_edge_index, device)
     test_true, test_pred, test_names = predict(model, test_loader, line_edge_index, device)
     np.save(out_dir / f"train-seed-{seed}-true.npy", train_true)
     np.save(out_dir / f"train-seed-{seed}-pred.npy", train_pred)
@@ -108,6 +109,32 @@ def run_seed(seed, args, config, train_data, test_data, line_edge_index, first_d
     }
 
 
+def align_seed_split(split_name, seed, true, pred, names, true_ref, names_ref):
+    names = np.asarray(names, dtype=str)
+    if names_ref is None:
+        if len(np.unique(names)) != len(names):
+            raise RuntimeError(f"{split_name}: duplicate sample names for seed {seed}")
+        return true, pred, names
+
+    if len(np.unique(names)) != len(names):
+        raise RuntimeError(f"{split_name}: duplicate sample names for seed {seed}")
+    if len(names) != len(names_ref) or set(names.tolist()) != set(names_ref.tolist()):
+        missing = sorted(set(names_ref.tolist()) - set(names.tolist()))
+        extra = sorted(set(names.tolist()) - set(names_ref.tolist()))
+        raise RuntimeError(
+            f"{split_name}: sample-name set mismatch for seed {seed}; "
+            f"missing={missing[:5]} extra={extra[:5]}"
+        )
+
+    index = {name: idx for idx, name in enumerate(names.tolist())}
+    order = np.asarray([index[name] for name in names_ref.tolist()], dtype=np.int64)
+    true = true[order]
+    pred = pred[order]
+    if not np.allclose(true_ref, true):
+        raise RuntimeError(f"{split_name}: target mismatch after name alignment for seed {seed}")
+    return true, pred, names_ref
+
+
 def save_ensemble(split_name, out_dir, seeds):
     true_ref = names_ref = None
     preds = []
@@ -116,13 +143,9 @@ def save_ensemble(split_name, out_dir, seeds):
         pred = np.load(out_dir / f"{split_name}-seed-{seed}-pred.npy")
         names = np.load(out_dir / f"{split_name}-seed-{seed}-names.npy", allow_pickle=False)
         if true_ref is None:
-            true_ref = true
-            names_ref = names
+            true_ref, pred, names_ref = align_seed_split(split_name, seed, true, pred, names, None, None)
         else:
-            if not np.array_equal(names_ref, names):
-                raise RuntimeError(f"{split_name}: name order mismatch for seed {seed}")
-            if not np.allclose(true_ref, true):
-                raise RuntimeError(f"{split_name}: target mismatch for seed {seed}")
+            _, pred, _ = align_seed_split(split_name, seed, true, pred, names, true_ref, names_ref)
         preds.append(pred)
     pred_mean = np.mean(np.stack(preds, axis=0), axis=0)
     metrics = snn.metrics_from_arrays(true_ref, pred_mean)
@@ -132,6 +155,27 @@ def save_ensemble(split_name, out_dir, seeds):
     with (out_dir / f"{split_name}-ensemble-metrics.json").open("w") as fp:
         json.dump(metrics, fp, indent=2, sort_keys=True)
     return metrics
+
+
+def write_ensemble_summary(args, config, seeds, train_metrics, test_metrics, out_dir):
+    summary = {
+        "method": args.method,
+        "feature_tag": config.tag,
+        "seeds": seeds,
+        "lr": args.lr,
+        "h_dim": args.h_dim,
+        "layers": args.layers,
+        "epochs": args.epochs,
+        "conv_type": args.conv_type,
+        "loss": args.loss,
+        "scaler": args.scaler,
+        "feature_transform": args.feature_transform,
+        "pooling": args.pooling,
+        "train_ensemble": train_metrics,
+        "test_ensemble": test_metrics,
+    }
+    with (out_dir / "ensemble_summary.json").open("w") as fp:
+        json.dump(summary, fp, indent=2, sort_keys=True)
 
 
 def main():
@@ -159,6 +203,11 @@ def main():
     parser.add_argument("--seeds", type=str, default="42,1,2,3,4,5,6,7,8,9")
     parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--output-folder", type=str, default="results/ld50/snn")
+    parser.add_argument(
+        "--ensemble-only",
+        action="store_true",
+        help="Skip training and rebuild ensemble metrics from saved per-seed prediction files.",
+    )
     args = parser.parse_args()
 
     root = Path(args.root)
@@ -169,6 +218,18 @@ def main():
 
     methods = snn.build_methods(args.preset, args.feature_root_tag)
     config = methods[args.method]
+
+    if args.ensemble_only:
+        train_metrics = save_ensemble("train", out_dir, seeds)
+        test_metrics = save_ensemble("test", out_dir, seeds)
+        write_ensemble_summary(args, config, seeds, train_metrics, test_metrics, out_dir)
+        print(
+            f"#### ENSEMBLE {args.method} test PCC={test_metrics['pcc']:.6f} "
+            f"R2={test_metrics['r2_paper']:.6f} RMSE={test_metrics['rmse']:.6f} MAE={test_metrics['mae']:.6f}",
+            flush=True,
+        )
+        return
+
     train_rows = snn.read_split_csv(root, "train")
     test_rows = snn.read_split_csv(root, "test")
     train_dir = snn.feature_folder(root, args.method, config.tag, "train")
@@ -223,24 +284,7 @@ def main():
 
     train_metrics = save_ensemble("train", out_dir, seeds)
     test_metrics = save_ensemble("test", out_dir, seeds)
-    summary = {
-        "method": args.method,
-        "feature_tag": config.tag,
-        "seeds": seeds,
-        "lr": args.lr,
-        "h_dim": args.h_dim,
-        "layers": args.layers,
-        "epochs": args.epochs,
-        "conv_type": args.conv_type,
-        "loss": args.loss,
-        "scaler": args.scaler,
-        "feature_transform": args.feature_transform,
-        "pooling": args.pooling,
-        "train_ensemble": train_metrics,
-        "test_ensemble": test_metrics,
-    }
-    with (out_dir / "ensemble_summary.json").open("w") as fp:
-        json.dump(summary, fp, indent=2, sort_keys=True)
+    write_ensemble_summary(args, config, seeds, train_metrics, test_metrics, out_dir)
     print(
         f"#### ENSEMBLE {args.method} test PCC={test_metrics['pcc']:.6f} "
         f"R2={test_metrics['r2_paper']:.6f} RMSE={test_metrics['rmse']:.6f} MAE={test_metrics['mae']:.6f}",
