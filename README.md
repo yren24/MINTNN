@@ -32,7 +32,7 @@ MINTNN/
 
 The released feature archives are hosted on Google Drive:
 
-**Google Drive:** [MINTNN final feature archives](https://drive.google.com/drive/folders/1Y5hwU1WikPbT5pzhIL0ocmJcf9MWE1mv)
+[MINTNN final feature archives](https://drive.google.com/drive/folders/1Y5hwU1WikPbT5pzhIL0ocmJcf9MWE1mv)
 
 The folder is expected to contain:
 
