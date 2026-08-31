@@ -111,7 +111,6 @@ Examples:
 ```text
 LD50 + EIC + CTNN
 MOF O2 + CA + CNN
-MOF N2 + FPRC + GBT
 ```
 
 The helper dispatcher in `scripts/train.py` builds the appropriate application command and, by default, injects the final component settings recorded in `metadata/`:
@@ -130,15 +129,6 @@ python scripts/train.py \
     --application mof_o2 \
     --invariant CA \
     --architecture CNN
-```
-
-MOF N2 uptake with PH-GBT:
-
-```bash
-python scripts/train.py \
-    --application mof_n2 \
-    --invariant PH \
-    --architecture GBT
 ```
 
 Arguments not consumed by the dispatcher are forwarded to the application script, so component-specific settings can still be supplied:
